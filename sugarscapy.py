@@ -21,15 +21,24 @@ class Ant:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.direction = random.uniform(0, 2*math.pi)  # Random initial direction
+        self.inertia_countdown = random.randint(10, 30)  # Initial inertia countdown
 
     def move(self):
-        # Move randomly
-        self.x += random.uniform(-ANT_SPEED, ANT_SPEED)
-        self.y += random.uniform(-ANT_SPEED, ANT_SPEED)
+        if self.inertia_countdown == 0:
+            # Change direction and reset inertia countdown
+            self.direction = random.uniform(0, 2*math.pi)
+            self.inertia_countdown = random.randint(10, 30)
+        else:
+            # Move in the current direction
+            self.x += ANT_SPEED * math.cos(self.direction)
+            self.y += ANT_SPEED * math.sin(self.direction)
+            self.inertia_countdown -= 1
 
         # Ensure the ant stays within the screen boundaries
         self.x = max(0, min(self.x, WIDTH))
         self.y = max(0, min(self.y, HEIGHT))
+
 
 
 # SugarScape class
