@@ -4,7 +4,7 @@ import math
 
 # Constants
 GAME_WIDTH, HEIGHT = 600, 600  # Width of the game area
-ANALYTICS_WIDTH = 200  # Width of the analytics area
+ANALYTICS_WIDTH = 300  # Width of the analytics area (increased for better readability)
 WIDTH = GAME_WIDTH + ANALYTICS_WIDTH  # Total width
 SUGAR_RADIUS = 20  # Radius to define proximity for sugar detection
 ANT_SIZE = 10
@@ -19,6 +19,7 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)  # Color for sugar squares
+GRAY = (200, 200, 200)  # Border color
 
 # Ant class
 class Ant:
@@ -115,6 +116,8 @@ def main():
         # Draw analytics area
         analytics_surface = pygame.Surface((ANALYTICS_WIDTH, HEIGHT))
         analytics_surface.fill(WHITE)
+        pygame.draw.line(analytics_surface, GRAY, (0, 0), (0, HEIGHT), 3)  # Draw border line
+
         analytics_data = sugarscape.get_analytics_data()
         y_offset = 20
         for key, value in analytics_data.items():
