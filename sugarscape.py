@@ -13,6 +13,7 @@ NUM_ANTS = 20
 SUGAR_MAX = 100  # Max sugar per patch
 SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
+NEW_SUGAR_INTERVAL = 5000  # Interval in milliseconds to add new sugar patches
 
 # Ant health constants
 INITIAL_HEALTH = 100
@@ -65,6 +66,7 @@ class SugarScape:
         self.sugar_patches = self.initialize_sugar_patches()
         self.consumed_sugar_count = 0
         self.dead_ants_count = 0
+        self.next_sugar_time = pygame.time.get_ticks() + NEW_SUGAR_INTERVAL
 
     def initialize_sugar_patches(self):
         patches = []
@@ -76,6 +78,11 @@ class SugarScape:
         return patches
 
     def update(self):
+        current_time = pygame.time.get_ticks()
+        if current_time >= self.next_sugar_time:
+            self.add_new_sugar_patch()
+            self.next_sugar_time = current_time + NEW_SUGAR_INTERVAL
+
         alive_ants = []
         for ant in self.ants:
             if ant.is_alive():
@@ -102,6 +109,14 @@ class SugarScape:
             if not sugar[2]:  # If the sugar is consumed
                 if random.random() < SUGAR_REGENERATION_RATE:
                     sugar[2] = True  # Regenerate sugar
+
+    def add_new_sugar_patch(self):
+        x = random.randint(0, GAME_WIDTH)
+        y = random.randint(0, HEIGHT)
+        for n in range(SUGAR_MAX):
+            square_x = x + (n % 10) * SQUARE_SIZE - 5 * SQUARE_SIZE
+            square_y = y + (n // 10) * SQUARE_SIZE - 5 * SQUARE_SIZE
+            self.sugar_patches.append([square_x, square_y, True])
 
     def draw(self, screen):
         screen.fill(WHITE)
