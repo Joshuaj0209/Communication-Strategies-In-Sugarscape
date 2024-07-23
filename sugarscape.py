@@ -14,6 +14,12 @@ SUGAR_MAX = 100  # Max sugar per patch
 SUGAR_REGENERATION_RATE = 0.1
 SQUARE_SIZE = 5  # Size of each sugar square
 
+# Ant health constants
+INITIAL_HEALTH = 100
+MAX_HEALTH = 150
+HEALTH_DECREASE_RATE = 0.1
+HEALTH_INCREASE_AMOUNT = 20
+
 # Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -28,6 +34,8 @@ class Ant:
         self.y = y
         self.direction = random.uniform(0, 2 * math.pi)  # Random initial direction
         self.turn_angle = math.pi / 8  # Maximum turn angle per step
+        self.health = INITIAL_HEALTH
+        self.max_health = MAX_HEALTH
 
     def move(self):
         # Smooth random movement
@@ -39,6 +47,15 @@ class Ant:
         self.x = max(0, min(self.x, GAME_WIDTH))
         self.y = max(0, min(self.y, HEIGHT))
 
+        # Decrease health over time
+        self.health -= HEALTH_DECREASE_RATE
+
+    def eat_sugar(self):
+        self.health = min(self.health + HEALTH_INCREASE_AMOUNT, self.max_health)  # Increase health but not above max
+
+    def is_alive(self):
+        return self.health > 0
+
 # SugarScape class
 class SugarScape:
     def __init__(self):
@@ -46,6 +63,7 @@ class SugarScape:
         self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT)) for _ in range(NUM_ANTS)]
         self.sugar_patches = self.initialize_sugar_patches()
         self.consumed_sugar_count = 0
+        self.dead_ants_count = 0
 
     def initialize_sugar_patches(self):
         patches = []
@@ -57,19 +75,26 @@ class SugarScape:
         return patches
 
     def update(self):
-        # Check for ant discovering sugar
+        alive_ants = []
         for ant in self.ants:
-            for sugar in self.sugar_patches:
-                if sugar[2]:  # Sugar is available
-                    dx = sugar[0] - ant.x
-                    dy = sugar[1] - ant.y
-                    dist = math.sqrt(dx ** 2 + dy ** 2)
-                    if dist < SUGAR_RADIUS:
-                        sugar[2] = False  # Mark sugar as consumed
-                        self.consumed_sugar_count += 1
-                        break
+            if ant.is_alive():
+                for sugar in self.sugar_patches:
+                    if sugar[2]:  # Sugar is available
+                        dx = sugar[0] - ant.x
+                        dy = sugar[1] - ant.y
+                        dist = math.sqrt(dx ** 2 + dy ** 2)
+                        if dist < SUGAR_RADIUS:
+                            sugar[2] = False  # Mark sugar as consumed
+                            self.consumed_sugar_count += 1
+                            ant.eat_sugar()
+                            break
 
-            ant.move()  # Move ant whether or not sugar was found
+                ant.move()  # Move ant whether or not sugar was found
+                alive_ants.append(ant)
+            else:
+                self.dead_ants_count += 1  # Count the dead ant
+
+        self.ants = alive_ants  # Update the list of alive ants
 
     def draw(self, screen):
         screen.fill(WHITE)
@@ -87,6 +112,7 @@ class SugarScape:
             'Consumed Sugar': self.consumed_sugar_count,
             'Remaining Sugar': len([s for s in self.sugar_patches if s[2]]),
             'Number of Ants': len(self.ants),
+            'Dead Ants': self.dead_ants_count,
         }
 
 # Main function
