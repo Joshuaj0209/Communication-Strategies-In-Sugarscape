@@ -6,22 +6,22 @@ import math
 GAME_WIDTH, HEIGHT = 700, 700  # Width of the game area
 ANALYTICS_WIDTH = 300  # Width of the analytics area (increased for better readability)
 WIDTH = GAME_WIDTH + ANALYTICS_WIDTH  # Total width
-SUGAR_RADIUS = 20  # Radius to define proximity for sugar detection
+SUGAR_RADIUS = 20  # Radius to define proximity for sugar consumption
 ANT_SIZE = 10
 ANT_SPEED = 1
 NUM_ANTS = 20
-SUGAR_MAX = 100  # Max sugar per patch
+SUGAR_MAX = 50  # Max sugar per patch
 SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
 NEW_SUGAR_INTERVAL = 5000  # Interval in milliseconds to add new sugar patches
-COMMUNICATION_RADIUS =100  # Communication range for ants
-DETECTION_RADIUS = 50  # Radius for ant's "vision"
+COMMUNICATION_RADIUS =200  # Communication range for ants
+DETECTION_RADIUS = 70  # Radius for ant's "vision"
 
 # Ant health constants
 INITIAL_HEALTH = 100
 MAX_HEALTH = 150
 HEALTH_DECREASE_RATE = 0.1
-HEALTH_INCREASE_AMOUNT = 20
+HEALTH_INCREASE_AMOUNT = 10
 
 # Colors
 WHITE = (255, 255, 255)
@@ -39,13 +39,16 @@ class Ant:
         self.direction = random.uniform(0, 2 * math.pi)  # Random initial direction
         self.turn_angle = math.pi / 8  # Maximum turn angle per step
         self.health = INITIAL_HEALTH
+        self.initial_health = INITIAL_HEALTH
         self.max_health = MAX_HEALTH
         self.target = None  # New attribute to store target sugar location
+        self.communicated_target = None
 
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
         closest_distance = float('inf')
         
+        # Check detected sugar
         for sugar in sugar_patches:
             if sugar[2]:  # If sugar is available
                 dx = sugar[0] - self.x
@@ -56,8 +59,21 @@ class Ant:
                     closest_sugar = sugar
                     closest_distance = distance
         
-        if closest_sugar:
+        # Check communicated location
+        if self.communicated_target:
+            dx = self.communicated_target[0] - self.x
+            dy = self.communicated_target[1] - self.y
+            distance = math.sqrt(dx**2 + dy**2)
+            if distance < closest_distance:
+                closest_sugar = self.communicated_target
+                closest_distance = distance
+        
+        if closest_sugar and self.needs_to_eat():
             self.target = (closest_sugar[0], closest_sugar[1])
+        else:
+            self.target = None  # Clear target if not hungry
+        
+        self.communicated_target = None  # Clear communicated target after considering it
                 
     def move(self):
         if self.target:
@@ -73,13 +89,13 @@ class Ant:
             else:
                 # Move towards target
                 self.direction = math.atan2(dy, dx)
-                self.x += ANT_SPEED * math.cos(self.direction)
-                self.y += ANT_SPEED * math.sin(self.direction)
         else:
-            # Existing random movement code
+            # Random movement if no target
             self.direction += random.uniform(-self.turn_angle, self.turn_angle)
-            self.x += ANT_SPEED * math.cos(self.direction)
-            self.y += ANT_SPEED * math.sin(self.direction)
+
+        # Move the ant
+        self.x += ANT_SPEED * math.cos(self.direction)
+        self.y += ANT_SPEED * math.sin(self.direction)
 
         # Ensure the ant stays within the game area boundaries
         self.x = max(0, min(self.x, GAME_WIDTH))
@@ -88,8 +104,12 @@ class Ant:
         # Decrease health over time
         self.health -= HEALTH_DECREASE_RATE
 
+    def needs_to_eat(self):
+        return self.health < self.initial_health
+
     def eat_sugar(self):
-        self.health = min(self.health + HEALTH_INCREASE_AMOUNT, self.max_health)  # Increase health but not above max
+        if self.needs_to_eat():
+            self.health = min(self.health + HEALTH_INCREASE_AMOUNT, self.max_health)
 
     def is_alive(self):
         return self.health > 0
@@ -122,8 +142,8 @@ class SugarScape:
         alive_ants = []
         for ant in self.ants:
             if ant.is_alive():
-                ant.detect_sugar(self.sugar_patches)  # New line to detect sugar
-                ant.move()  # Move ant after detecting sugar
+                ant.detect_sugar(self.sugar_patches)
+                ant.move()
                 
                 # Check if ant has reached sugar after moving
                 for sugar in self.sugar_patches:
@@ -131,7 +151,7 @@ class SugarScape:
                         dx = sugar[0] - ant.x
                         dy = sugar[1] - ant.y
                         dist = math.sqrt(dx ** 2 + dy ** 2)
-                        if dist < SUGAR_RADIUS:
+                        if dist < SUGAR_RADIUS and ant.needs_to_eat():
                             sugar[2] = False  # Mark sugar as consumed
                             self.consumed_sugar_count += 1
                             ant.eat_sugar()
@@ -151,7 +171,7 @@ class SugarScape:
                 dy = other_ant.y - ant.y
                 dist = math.sqrt(dx ** 2 + dy ** 2)
                 if dist < COMMUNICATION_RADIUS:
-                    other_ant.target = (sugar_x, sugar_y)  # Set target to the sugar location
+                    other_ant.communicated_target = (sugar_x, sugar_y)
 
     def add_new_sugar_patch(self):
         x = random.randint(0, GAME_WIDTH)
