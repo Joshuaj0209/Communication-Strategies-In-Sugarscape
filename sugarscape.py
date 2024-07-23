@@ -14,6 +14,7 @@ SUGAR_MAX = 100  # Max sugar per patch
 SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
 NEW_SUGAR_INTERVAL = 5000  # Interval in milliseconds to add new sugar patches
+COMMUNICATION_RADIUS = 100  # Communication range for ants
 
 # Ant health constants
 INITIAL_HEALTH = 100
@@ -38,10 +39,23 @@ class Ant:
         self.turn_angle = math.pi / 8  # Maximum turn angle per step
         self.health = INITIAL_HEALTH
         self.max_health = MAX_HEALTH
+        self.target = None  # New attribute to store target sugar location
 
     def move(self):
-        # Smooth random movement
-        self.direction += random.uniform(-self.turn_angle, self.turn_angle)
+        if self.target:
+            # Move towards the target location
+            dx = self.target[0] - self.x
+            dy = self.target[1] - self.y
+            self.direction = math.atan2(dy, dx)
+            
+            # Check if the ant has reached the target location
+            dist = math.sqrt(dx ** 2 + dy ** 2)
+            if dist < SUGAR_RADIUS:
+                self.target = None  # Reset target if the location is reached
+        else:
+            # Smooth random movement
+            self.direction += random.uniform(-self.turn_angle, self.turn_angle)
+        
         self.x += ANT_SPEED * math.cos(self.direction)
         self.y += ANT_SPEED * math.sin(self.direction)
 
@@ -95,6 +109,7 @@ class SugarScape:
                             sugar[2] = False  # Mark sugar as consumed
                             self.consumed_sugar_count += 1
                             ant.eat_sugar()
+                            self.broadcast_sugar_location(ant, sugar[0], sugar[1])  # Broadcast sugar location
                             break
 
                 ant.move()  # Move ant whether or not sugar was found
@@ -109,6 +124,15 @@ class SugarScape:
             if not sugar[2]:  # If the sugar is consumed
                 if random.random() < SUGAR_REGENERATION_RATE:
                     sugar[2] = True  # Regenerate sugar
+
+    def broadcast_sugar_location(self, ant, sugar_x, sugar_y):
+        for other_ant in self.ants:
+            if other_ant != ant:
+                dx = other_ant.x - ant.x
+                dy = other_ant.y - ant.y
+                dist = math.sqrt(dx ** 2 + dy ** 2)
+                if dist < COMMUNICATION_RADIUS:
+                    other_ant.target = (sugar_x, sugar_y)  # Set target to the sugar location
 
     def add_new_sugar_patch(self):
         x = random.randint(0, GAME_WIDTH)
