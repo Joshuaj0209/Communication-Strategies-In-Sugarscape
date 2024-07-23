@@ -3,7 +3,7 @@ import random
 import math
 
 # Constants
-GAME_WIDTH, HEIGHT = 600, 600  # Width of the game area
+GAME_WIDTH, HEIGHT = 700, 700  # Width of the game area
 ANALYTICS_WIDTH = 300  # Width of the analytics area (increased for better readability)
 WIDTH = GAME_WIDTH + ANALYTICS_WIDTH  # Total width
 SUGAR_RADIUS = 20  # Radius to define proximity for sugar detection
@@ -11,7 +11,7 @@ ANT_SIZE = 10
 ANT_SPEED = 1
 NUM_ANTS = 20
 SUGAR_MAX = 100  # Max sugar per patch
-SUGAR_REGENERATION_RATE = 0.1
+SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
 
 # Ant health constants
@@ -25,6 +25,7 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)  # Color for sugar squares
+YELLOW = (255, 255, 0)  # Color for consumed sugar squares
 GRAY = (200, 200, 200)  # Border color
 
 # Ant class
@@ -59,7 +60,7 @@ class Ant:
 # SugarScape class
 class SugarScape:
     def __init__(self):
-        self.sugar_spots = [(200, 300), (400, 300)]
+        self.sugar_spots = [(200, 350), (500, 350)]
         self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT)) for _ in range(NUM_ANTS)]
         self.sugar_patches = self.initialize_sugar_patches()
         self.consumed_sugar_count = 0
@@ -96,12 +97,20 @@ class SugarScape:
 
         self.ants = alive_ants  # Update the list of alive ants
 
+        # Regenerate sugar over time
+        for sugar in self.sugar_patches:
+            if not sugar[2]:  # If the sugar is consumed
+                if random.random() < SUGAR_REGENERATION_RATE:
+                    sugar[2] = True  # Regenerate sugar
+
     def draw(self, screen):
         screen.fill(WHITE)
         # Draw sugar patches
         for sugar in self.sugar_patches:
             if sugar[2]:  # Only draw available sugar
                 pygame.draw.rect(screen, GREEN, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
+            else:  # Draw a yellow patch where sugar was consumed
+                pygame.draw.rect(screen, YELLOW, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
         # Draw ants
         for ant in self.ants:
             pygame.draw.circle(screen, RED, (int(ant.x), int(ant.y)), ANT_SIZE)
