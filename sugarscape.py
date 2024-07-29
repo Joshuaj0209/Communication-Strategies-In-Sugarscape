@@ -10,11 +10,11 @@ SUGAR_RADIUS = 20  # Radius to define proximity for sugar consumption
 ANT_SIZE = 10
 ANT_SPEED = 1
 NUM_ANTS = 20
-SUGAR_MAX = 50  # Max sugar per patch
+SUGAR_MAX = 100  # Max sugar per patch
 SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
 NEW_SUGAR_INTERVAL = 5000  # Interval in milliseconds to add new sugar patches
-COMMUNICATION_RADIUS =200  # Communication range for ants
+COMMUNICATION_RADIUS = 700  # Communication range for ants
 DETECTION_RADIUS = 70  # Radius for ant's "vision"
 
 # Ant health constants
@@ -135,14 +135,15 @@ class SugarScape:
 
     def update(self):
         current_time = pygame.time.get_ticks()
-        if current_time >= self.next_sugar_time:
-            self.add_new_sugar_patch()
-            self.next_sugar_time = current_time + NEW_SUGAR_INTERVAL
+        # if current_time >= self.next_sugar_time:
+        #     self.add_new_sugar_patch()
+        #     self.next_sugar_time = current_time + NEW_SUGAR_INTERVAL
 
         alive_ants = []
         for ant in self.ants:
             if ant.is_alive():
-                ant.detect_sugar(self.sugar_patches)
+                if not ant.target:  # Update target only if there's no current target
+                    ant.detect_sugar(self.sugar_patches)
                 ant.move()
                 
                 # Check if ant has reached sugar after moving
@@ -170,7 +171,7 @@ class SugarScape:
                 dx = other_ant.x - ant.x
                 dy = other_ant.y - ant.y
                 dist = math.sqrt(dx ** 2 + dy ** 2)
-                if dist < COMMUNICATION_RADIUS:
+                if dist < COMMUNICATION_RADIUS and not other_ant.target:  # Only update if the other ant has no target
                     other_ant.communicated_target = (sugar_x, sugar_y)
 
     def add_new_sugar_patch(self):
