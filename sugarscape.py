@@ -15,7 +15,7 @@ SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
 NEW_SUGAR_INTERVAL = 5000  # Interval in milliseconds to add new sugar patches
 COMMUNICATION_RADIUS = 700  # Communication range for ants
-DETECTION_RADIUS = 100  # Radius for ant's "vision"
+DETECTION_RADIUS = 150  # Radius for ant's "vision"
 
 # Ant health constants
 INITIAL_HEALTH = 100
@@ -137,7 +137,7 @@ class SugarScape:
                 sugar_detected = ant.detect_sugar(self.sugar_patches)
                 
                 # If no sugar detected within radius and no current target, use communicated target
-                if not sugar_detected and not ant.target:
+                if not sugar_detected and not ant.target and ant.needs_to_eat():
                     if ant.communicated_target:
                         ant.target = ant.communicated_target
                         ant.communicated_target = None
