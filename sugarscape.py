@@ -9,13 +9,13 @@ WIDTH = GAME_WIDTH + ANALYTICS_WIDTH  # Total width
 SUGAR_RADIUS = 20  # Radius to define proximity for sugar consumption
 ANT_SIZE = 10
 ANT_SPEED = 1
-NUM_ANTS = 20
+NUM_ANTS = 5
 SUGAR_MAX = 100  # Max sugar per patch
 SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
 NEW_SUGAR_INTERVAL = 5000  # Interval in milliseconds to add new sugar patches
 COMMUNICATION_RADIUS = 700  # Communication range for ants
-DETECTION_RADIUS = 70  # Radius for ant's "vision"
+DETECTION_RADIUS = 100  # Radius for ant's "vision"
 
 # Ant health constants
 INITIAL_HEALTH = 100
@@ -48,7 +48,7 @@ class Ant:
         closest_sugar = None
         closest_distance = float('inf')
         
-        # Check detected sugar
+        # Check for sugar within detection radius
         for sugar in sugar_patches:
             if sugar[2]:  # If sugar is available
                 dx = sugar[0] - self.x
@@ -59,21 +59,12 @@ class Ant:
                     closest_sugar = sugar
                     closest_distance = distance
         
-        # Check communicated location
-        if self.communicated_target:
-            dx = self.communicated_target[0] - self.x
-            dy = self.communicated_target[1] - self.y
-            distance = math.sqrt(dx**2 + dy**2)
-            if distance < closest_distance:
-                closest_sugar = self.communicated_target
-                closest_distance = distance
-        
+        # Update target if sugar is found within detection radius
         if closest_sugar and self.needs_to_eat():
             self.target = (closest_sugar[0], closest_sugar[1])
-        else:
-            self.target = None  # Clear target if not hungry
+            return True  # Indicate that the target was updated
         
-        self.communicated_target = None  # Clear communicated target after considering it
+        return False  # Indicate that no sugar was found within detection radius
                 
     def move(self):
         if self.target:
@@ -142,8 +133,15 @@ class SugarScape:
         alive_ants = []
         for ant in self.ants:
             if ant.is_alive():
-                if not ant.target:  # Update target only if there's no current target
-                    ant.detect_sugar(self.sugar_patches)
+                # Always check for sugar within detection radius
+                sugar_detected = ant.detect_sugar(self.sugar_patches)
+                
+                # If no sugar detected within radius and no current target, use communicated target
+                if not sugar_detected and not ant.target:
+                    if ant.communicated_target:
+                        ant.target = ant.communicated_target
+                        ant.communicated_target = None
+                
                 ant.move()
                 
                 # Check if ant has reached sugar after moving
