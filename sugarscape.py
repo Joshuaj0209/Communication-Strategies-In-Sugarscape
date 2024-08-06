@@ -43,6 +43,7 @@ class Ant:
         self.max_health = MAX_HEALTH
         self.target = None  # New attribute to store target sugar location
         self.communicated_target = None
+        self.lifespan = 0  # Track the lifespan of the ant
 
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -95,6 +96,9 @@ class Ant:
         # Decrease health over time
         self.health -= HEALTH_DECREASE_RATE
 
+        # Increase lifespan
+        self.lifespan += 1
+
     def needs_to_eat(self):
         return self.health < self.initial_health
 
@@ -114,6 +118,8 @@ class SugarScape:
         self.consumed_sugar_count = 0
         self.dead_ants_count = 0
         self.next_sugar_time = pygame.time.get_ticks() + NEW_SUGAR_INTERVAL
+        self.communicated_locations = []  # List to store communicated locations
+        self.total_lifespan_of_dead_ants = 0  # Track the total lifespan of dead ants
 
     def initialize_sugar_patches(self):
         patches = []
@@ -126,10 +132,6 @@ class SugarScape:
 
     def update(self):
         current_time = pygame.time.get_ticks()
-        # if current_time >= self.next_sugar_time:
-        #     self.add_new_sugar_patch()
-        #     self.next_sugar_time = current_time + NEW_SUGAR_INTERVAL
-
         alive_ants = []
         for ant in self.ants:
             if ant.is_alive():
@@ -160,6 +162,7 @@ class SugarScape:
                 alive_ants.append(ant)
             else:
                 self.dead_ants_count += 1
+                self.total_lifespan_of_dead_ants += ant.lifespan
 
         self.ants = alive_ants
 
@@ -171,6 +174,8 @@ class SugarScape:
                 dist = math.sqrt(dx ** 2 + dy ** 2)
                 if dist < COMMUNICATION_RADIUS and not other_ant.target:  # Only update if the other ant has no target
                     other_ant.communicated_target = (sugar_x, sugar_y)
+        # Add the communicated location to the list for debugging
+        self.communicated_locations.append((sugar_x, sugar_y))
 
     def add_new_sugar_patch(self):
         x = random.randint(0, GAME_WIDTH)
@@ -191,14 +196,19 @@ class SugarScape:
         # Draw ants
         for ant in self.ants:
             pygame.draw.circle(screen, RED, (int(ant.x), int(ant.y)), ANT_SIZE)
+        # Draw communicated locations as red squares
+        for loc in self.communicated_locations:
+            pygame.draw.rect(screen, RED, (loc[0], loc[1], SQUARE_SIZE, SQUARE_SIZE))
 
     def get_analytics_data(self):
+        average_lifespan = self.total_lifespan_of_dead_ants / self.dead_ants_count if self.dead_ants_count > 0 else 0
         return {
             'Total Sugar Patches': len(self.sugar_patches),
             'Consumed Sugar': self.consumed_sugar_count,
             'Remaining Sugar': len([s for s in self.sugar_patches if s[2]]),
             'Number of Ants': len(self.ants),
             'Dead Ants': self.dead_ants_count,
+            'Average Lifespan': average_lifespan,
         }
 
 # Main function
