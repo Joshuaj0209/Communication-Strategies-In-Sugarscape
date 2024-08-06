@@ -158,6 +158,10 @@ class SugarScape:
                             ant.eat_sugar()
                             self.broadcast_sugar_location(ant, sugar[0], sugar[1])
                             break
+                
+                # Randomly broadcast false sugar locations
+                if random.random() < 0.001:  # 5% chance per update cycle
+                    self.broadcast_sugar_location(ant, None, None, false_location=True)
 
                 alive_ants.append(ant)
             else:
@@ -166,16 +170,23 @@ class SugarScape:
 
         self.ants = alive_ants
 
-    def broadcast_sugar_location(self, ant, sugar_x, sugar_y):
+    def broadcast_sugar_location(self, ant, sugar_x, sugar_y, false_location=False):
+        # Determine if the location to broadcast is true or false
+        if false_location or random.random() < 0.5:
+            broadcast_x = random.randint(0, GAME_WIDTH)  # False location
+            broadcast_y = random.randint(0, HEIGHT)  # False location
+        else:
+            broadcast_x, broadcast_y = sugar_x, sugar_y  # True location
+
         for other_ant in self.ants:
             if other_ant != ant:
                 dx = other_ant.x - ant.x
                 dy = other_ant.y - ant.y
                 dist = math.sqrt(dx ** 2 + dy ** 2)
                 if dist < COMMUNICATION_RADIUS and not other_ant.target:  # Only update if the other ant has no target
-                    other_ant.communicated_target = (sugar_x, sugar_y)
+                    other_ant.communicated_target = (broadcast_x, broadcast_y)
         # Add the communicated location to the list for debugging
-        self.communicated_locations.append((sugar_x, sugar_y))
+        self.communicated_locations.append((broadcast_x, broadcast_y))
 
     def add_new_sugar_patch(self):
         x = random.randint(0, GAME_WIDTH)
