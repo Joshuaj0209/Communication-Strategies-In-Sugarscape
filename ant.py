@@ -15,7 +15,15 @@ class Ant:
         self.target = None
         self.communicated_targets = {}  # Dictionary to store communicated locations and their counts
         self.lifespan = 0
-        self.next_target_selection_time = pygame.time.get_ticks() + TARGET_SELECTION_INTERVAL  # Initialize the time for the first target selection
+        
+        # Set the mean and standard deviation for the target selection interval
+        self.mean_interval = 8000  # Mean interval of 8000ms
+        self.std_deviation = 2000  # Standard deviation of 2000ms
+
+        # Use a normal distribution for the first target selection interval
+        self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
+        self.next_target_selection_time = pygame.time.get_ticks() + self.target_selection_interval
+        
         self.communicated_sugar_locations = []  # List to store sugar locations this ant has communicated
         self.following_true_location = False  # Track if the ant is following a true location
         self.following_false_location = False  # Track if the ant is following a false location
@@ -105,7 +113,9 @@ class Ant:
                     elif self.following_false_location:
                         sugarscape.true_negatives += 1
 
-                self.next_target_selection_time += TARGET_SELECTION_INTERVAL
+                # Generate a new target selection interval based on a normal distribution
+                self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
+                self.next_target_selection_time += self.target_selection_interval
 
         # Move towards the target if one is selected
         if self.target:
