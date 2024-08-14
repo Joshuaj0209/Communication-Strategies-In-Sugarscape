@@ -15,18 +15,18 @@ class Ant:
         self.target = None
         self.communicated_targets = {}  # Dictionary to store communicated locations and their counts
         self.lifespan = 0
-        
+
         # Set the mean and standard deviation for the target selection interval
         self.mean_interval = 8000  # Mean interval of 8000ms
         self.std_deviation = 2000  # Standard deviation of 2000ms
 
         # Use a normal distribution for the first target selection interval
         self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
-        self.next_target_selection_time = pygame.time.get_ticks() + self.target_selection_interval
-        
+
         self.communicated_sugar_locations = []  # List to store sugar locations this ant has communicated
         self.following_true_location = False  # Track if the ant is following a true location
         self.following_false_location = False  # Track if the ant is following a false location
+        self.confirmed_false_locations = []  # List to store confirmed false locations
 
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -54,6 +54,10 @@ class Ant:
             best_score = -float('inf')  # Start with the lowest possible score
 
             for (target_info, count) in self.communicated_targets.items():
+                # Skip confirmed false locations
+                if target_info[:2] in self.confirmed_false_locations:
+                    continue
+
                 # Calculate the distance to the target
                 dx = target_info[0] - self.x
                 dy = target_info[1] - self.y
@@ -83,11 +87,10 @@ class Ant:
                 else:
                     self.following_true_location = False
                     self.following_false_location = True
-                
+
                 # Broadcast the target if not previously communicated
                 if (self.target[0], self.target[1]) not in self.communicated_sugar_locations:
                     sugarscape.broadcast_sugar_location(self, self.target[0], self.target[1], self.target, false_location=not self.following_true_location)
-
 
     def move(self, sugar_patches, sugarscape):
         current_time = pygame.time.get_ticks()
@@ -114,7 +117,7 @@ class Ant:
                         sugarscape.true_negatives += 1
 
                 # Generate a new target selection interval based on a normal distribution
-                self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
+                self.target_selection_interval = max(500, random.gauss(TARGET_SELECTION_INTERVAL, TARGET_SELECTION_INTERVAL / 4))
                 self.next_target_selection_time += self.target_selection_interval
 
         # Move towards the target if one is selected
@@ -125,6 +128,9 @@ class Ant:
 
             if distance < ANT_SPEED:
                 self.x, self.y = self.target
+                # Check if the target was false and add it to confirmed_false_locations
+                if not self.following_true_location:
+                    self.confirmed_false_locations.append(self.target)
                 self.target = None
             else:
                 self.direction = math.atan2(dy, dx)

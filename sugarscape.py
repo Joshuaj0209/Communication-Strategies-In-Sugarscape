@@ -88,8 +88,9 @@ class SugarScape:
         if false_location:
             # If the ant is the designated false broadcaster, generate a new random false location.
             if ant == self.false_broadcaster:
-                broadcast_x = random.randint(0, GAME_WIDTH)
-                broadcast_y = random.randint(0, HEIGHT)
+                padding = 100  # Padding from the edges to avoid edges
+                broadcast_x = random.randint(padding, GAME_WIDTH - padding)
+                broadcast_y = random.randint(padding, HEIGHT - padding)
             else:
                 # Otherwise, use the false location that the ant actually selected.
                 broadcast_x, broadcast_y = sugar_x, sugar_y
