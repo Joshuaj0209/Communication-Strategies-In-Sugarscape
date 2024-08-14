@@ -15,7 +15,7 @@ SUGAR_REGENERATION_RATE = 0.0002
 SQUARE_SIZE = 5  # Size of each sugar square
 NEW_SUGAR_INTERVAL = 5000  # Interval in milliseconds to add new sugar patches
 COMMUNICATION_RADIUS = 700  # Communication range for ants
-DETECTION_RADIUS = 150  # Radius for ant's "vision"
+DETECTION_RADIUS = 60  # Radius for ant's "vision"
 
 # Ant health constants
 INITIAL_HEALTH = 100
@@ -120,6 +120,8 @@ class SugarScape:
         self.next_sugar_time = pygame.time.get_ticks() + NEW_SUGAR_INTERVAL
         self.communicated_locations = []  # List to store communicated locations
         self.total_lifespan_of_dead_ants = 0  # Track the total lifespan of dead ants
+        self.false_broadcaster = random.choice(self.ants)  # Select one ant to broadcast false locations
+        self.broadcast_time = pygame.time.get_ticks() + 1000  # Set a specific time for false broadcast (10 seconds from start)
 
     def initialize_sugar_patches(self):
         patches = []
@@ -159,9 +161,10 @@ class SugarScape:
                             self.broadcast_sugar_location(ant, sugar[0], sugar[1])
                             break
                 
-                # Randomly broadcast false sugar locations
-                if random.random() < 0.001:  # 5% chance per update cycle
+                # Broadcast false sugar location at a specific time
+                if ant == self.false_broadcaster and current_time >= self.broadcast_time:
                     self.broadcast_sugar_location(ant, None, None, false_location=True)
+                    self.broadcast_time += 10000  # Schedule next broadcast 10 seconds later
 
                 alive_ants.append(ant)
             else:
@@ -172,7 +175,7 @@ class SugarScape:
 
     def broadcast_sugar_location(self, ant, sugar_x, sugar_y, false_location=False):
         # Determine if the location to broadcast is true or false
-        if false_location or random.random() < 0.5:
+        if false_location:
             broadcast_x = random.randint(0, GAME_WIDTH)  # False location
             broadcast_y = random.randint(0, HEIGHT)  # False location
         else:
@@ -206,7 +209,10 @@ class SugarScape:
                 pygame.draw.rect(screen, YELLOW, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
         # Draw ants
         for ant in self.ants:
-            pygame.draw.circle(screen, RED, (int(ant.x), int(ant.y)), ANT_SIZE)
+            if ant == self.false_broadcaster:
+                pygame.draw.circle(screen, GREEN, (int(ant.x), int(ant.y)), ANT_SIZE)
+            else:
+                pygame.draw.circle(screen, RED, (int(ant.x), int(ant.y)), ANT_SIZE)
         # Draw communicated locations as red squares
         for loc in self.communicated_locations:
             pygame.draw.rect(screen, RED, (loc[0], loc[1], SQUARE_SIZE, SQUARE_SIZE))
