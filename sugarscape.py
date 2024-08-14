@@ -72,7 +72,13 @@ class SugarScape:
             broadcast_x = random.randint(0, GAME_WIDTH)
             broadcast_y = random.randint(0, HEIGHT)
         else:
+            # Check if the ant has already communicated this sugar patch
+            for loc in ant.communicated_sugar_locations:
+                if math.sqrt((loc[0] - sugar_x) ** 2 + (loc[1] - sugar_y) ** 2) < PATCH_RADIUS:
+                    return  # The ant has already communicated this sugar patch
+
             broadcast_x, broadcast_y = sugar_x, sugar_y
+            ant.communicated_sugar_locations.append((broadcast_x, broadcast_y))  # Mark this location as communicated by the ant
 
         for other_ant in self.ants:
             if other_ant != ant:
@@ -81,7 +87,9 @@ class SugarScape:
                 dist = math.sqrt(dx ** 2 + dy ** 2)
                 if dist < COMMUNICATION_RADIUS:
                     other_ant.communicated_targets.append((broadcast_x, broadcast_y))  # Add to the array of communicated targets
+
         self.communicated_locations.append((broadcast_x, broadcast_y))
+
 
     def add_new_sugar_patch(self):
         max_attempts = 100  

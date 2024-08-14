@@ -18,6 +18,7 @@ class Ant:
         self.communicated_targets = []  # Array to store communicated locations
         self.lifespan = 0
         self.next_target_selection_time = pygame.time.get_ticks() + TARGET_SELECTION_INTERVAL  # Initialize the time for the first target selection
+        self.communicated_sugar_locations = []  # List to store sugar locations this ant has communicated
 
     def detect_sugar(self, sugar_patches):
         closest_sugar = None

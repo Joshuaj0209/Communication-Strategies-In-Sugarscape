@@ -1,4 +1,5 @@
 # constants.py
+import math
 
 GAME_WIDTH, HEIGHT = 700, 700
 ANALYTICS_WIDTH = 300
@@ -14,6 +15,10 @@ NEW_SUGAR_INTERVAL = 15000
 COMMUNICATION_RADIUS = 700
 DETECTION_RADIUS = 60
 TARGET_SELECTION_INTERVAL = 10000
+
+
+grid_size = int(math.sqrt(SUGAR_MAX))  # Grid size for sugar patch
+PATCH_RADIUS = math.sqrt((SQUARE_SIZE * grid_size) ** 2 + (SQUARE_SIZE * grid_size) ** 2)
 
 # Ant health constants
 INITIAL_HEALTH = 100
