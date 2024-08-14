@@ -13,7 +13,7 @@ class Ant:
         self.initial_health = INITIAL_HEALTH
         self.max_health = MAX_HEALTH
         self.target = None
-        self.communicated_targets = []  # Array to store communicated locations
+        self.communicated_targets = {}  # Dictionary to store communicated locations and their counts
         self.lifespan = 0
         self.next_target_selection_time = pygame.time.get_ticks() + TARGET_SELECTION_INTERVAL  # Initialize the time for the first target selection
         self.communicated_sugar_locations = []  # List to store sugar locations this ant has communicated
@@ -42,14 +42,39 @@ class Ant:
 
     def select_new_target(self):
         if self.communicated_targets:
-            target_info = random.choice(self.communicated_targets)
-            self.target = target_info[:2]
-            if target_info[2] == "true":
-                self.following_true_location = True
-                self.following_false_location = False
-            else:
-                self.following_true_location = False
-                self.following_false_location = True
+            best_target = None
+            best_score = -float('inf')  # Start with the lowest possible score
+
+            for (target_info, count) in self.communicated_targets.items():
+                # Calculate the distance to the target
+                dx = target_info[0] - self.x
+                dy = target_info[1] - self.y
+                distance = math.sqrt(dx**2 + dy**2)
+
+                # Estimate the time to reach the target
+                time_to_reach = distance / ANT_SPEED
+
+                # Estimate health depletion over that time
+                health_depletion = time_to_reach * HEALTH_DECREASE_RATE
+
+                # Check if the ant can reach the target before dying
+                if self.health > health_depletion:
+                    # Calculate the score for this target
+                    # The score is higher for targets that are closer and have been communicated more often
+                    score = count / (distance*2 + 1)  # +1 to avoid division by zero
+
+                    if score > best_score:
+                        best_score = score
+                        best_target = target_info
+
+            if best_target:
+                self.target = best_target[:2]
+                if best_target[2] == "true":
+                    self.following_true_location = True
+                    self.following_false_location = False
+                else:
+                    self.following_true_location = False
+                    self.following_false_location = True
 
     def move(self, sugar_patches, sugarscape):
         current_time = pygame.time.get_ticks()
@@ -68,6 +93,12 @@ class Ant:
                         sugarscape.true_positives += 1
                     elif self.following_false_location:
                         sugarscape.false_positives += 1
+                else:
+                    # No target selected means the ant denied all locations
+                    if self.following_true_location:
+                        sugarscape.false_negatives += 1
+                    elif self.following_false_location:
+                        sugarscape.true_negatives += 1
 
                 self.next_target_selection_time += TARGET_SELECTION_INTERVAL
 

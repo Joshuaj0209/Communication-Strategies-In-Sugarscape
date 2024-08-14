@@ -101,8 +101,10 @@ class SugarScape:
                 dx = other_ant.x - ant.x
                 dy = other_ant.y - ant.y
                 dist = math.sqrt(dx ** 2 + dy ** 2)
-                if dist < COMMUNICATION_RADIUS:
-                    other_ant.communicated_targets.append((broadcast_x, broadcast_y, location_type))  # Add to the array of communicated targets
+                if (broadcast_x, broadcast_y, location_type) in other_ant.communicated_targets:
+                    other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] += 1  # Increment count if already communicated
+                else:
+                    other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] = 1  # Add new target with count 1
 
     def add_new_sugar_patch(self):
         max_attempts = 100  
