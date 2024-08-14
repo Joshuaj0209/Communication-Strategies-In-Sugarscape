@@ -36,13 +36,9 @@ class SugarScape:
 
         for ant in self.ants:
             if ant.is_alive():
-                sugar_detected = ant.detect_sugar(self.sugar_patches)
-                if not sugar_detected and not ant.target and ant.needs_to_eat():
-                    if ant.communicated_target:
-                        ant.target = ant.communicated_target
-                        ant.communicated_target = None
-                ant.move()
+                ant.move(self.sugar_patches)
 
+                # The rest of the code remains the same...
                 for sugar in self.sugar_patches:
                     if sugar[2]:
                         dx = sugar[0] - ant.x
@@ -83,13 +79,13 @@ class SugarScape:
                 dx = other_ant.x - ant.x
                 dy = other_ant.y - ant.y
                 dist = math.sqrt(dx ** 2 + dy ** 2)
-                if dist < COMMUNICATION_RADIUS and not other_ant.target:
-                    other_ant.communicated_target = (broadcast_x, broadcast_y)
+                if dist < COMMUNICATION_RADIUS:
+                    other_ant.communicated_targets.append((broadcast_x, broadcast_y))  # Add to the array of communicated targets
         self.communicated_locations.append((broadcast_x, broadcast_y))
 
     def add_new_sugar_patch(self):
-        max_attempts = 100  # Limit the number of attempts to find a suitable location
-        min_distance = 100  # Minimum distance from existing sugar patches
+        max_attempts = 100  
+        min_distance = 100  
 
         grid_size = int(math.sqrt(SUGAR_MAX)) 
         half_grid = grid_size // 2
@@ -98,7 +94,6 @@ class SugarScape:
             x = random.randint(0, GAME_WIDTH)
             y = random.randint(0, HEIGHT)
             
-            # Check if the new patch is too close to existing patches
             too_close = any(math.sqrt((x - sugar[0]) ** 2 + (y - sugar[1]) ** 2) < min_distance for sugar in self.sugar_patches)
             
             if not too_close:
