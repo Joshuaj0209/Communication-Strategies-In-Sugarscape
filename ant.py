@@ -40,7 +40,7 @@ class Ant:
         
         return False
 
-    def select_new_target(self):
+    def select_new_target(self, sugarscape):
         if self.communicated_targets:
             best_target = None
             best_score = -float('inf')  # Start with the lowest possible score
@@ -61,7 +61,7 @@ class Ant:
                 if self.health > health_depletion:
                     # Calculate the score for this target
                     # The score is higher for targets that are closer and have been communicated more often
-                    score = count / (distance*2 + 1)  # +1 to avoid division by zero
+                    score = count / (distance**2 + 1)  # +1 to avoid division by zero
 
                     if score > best_score:
                         best_score = score
@@ -75,6 +75,11 @@ class Ant:
                 else:
                     self.following_true_location = False
                     self.following_false_location = True
+                
+                # Broadcast the target if not previously communicated
+                if (self.target[0], self.target[1]) not in self.communicated_sugar_locations:
+                    sugarscape.broadcast_sugar_location(self, self.target[0], self.target[1], self.target, false_location=not self.following_true_location)
+
 
     def move(self, sugar_patches, sugarscape):
         current_time = pygame.time.get_ticks()
@@ -87,7 +92,7 @@ class Ant:
             # Check if it's time to select a new target
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
-                    self.select_new_target()
+                    self.select_new_target(sugarscape)
                     # Determine if the selection is true or false
                     if self.following_true_location:
                         sugarscape.true_positives += 1

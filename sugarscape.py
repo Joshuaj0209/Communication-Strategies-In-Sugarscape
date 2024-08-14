@@ -6,7 +6,15 @@ from ant import Ant
 
 class SugarScape:
     def __init__(self):
-        self.sugar_spots = [(200, 350), (500, 350)]
+        padding = 120  # Padding from the edges
+        patch_size = int(math.sqrt(SUGAR_MAX)) * SQUARE_SIZE  # Size of the entire sugar patch
+
+        # Top left and top right sugar patches with padding
+        self.sugar_spots = [
+            (padding + patch_size // 2, padding + patch_size // 2),  # Top left
+            (GAME_WIDTH - padding - patch_size // 2, HEIGHT - padding - patch_size // 2)  # Bottom right
+        ]
+
         self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT)) for _ in range(NUM_ANTS)]
         self.sugar_patches = self.initialize_sugar_patches()
         self.consumed_sugar_count = 0
@@ -78,8 +86,13 @@ class SugarScape:
 
     def broadcast_sugar_location(self, ant, sugar_x, sugar_y, patch_center, false_location=False):
         if false_location:
-            broadcast_x = random.randint(0, GAME_WIDTH)
-            broadcast_y = random.randint(0, HEIGHT)
+            # If the ant is the designated false broadcaster, generate a new random false location.
+            if ant == self.false_broadcaster:
+                broadcast_x = random.randint(0, GAME_WIDTH)
+                broadcast_y = random.randint(0, HEIGHT)
+            else:
+                # Otherwise, use the false location that the ant actually selected.
+                broadcast_x, broadcast_y = sugar_x, sugar_y
             location_type = "false"
         else:
             broadcast_x, broadcast_y = patch_center
@@ -105,6 +118,7 @@ class SugarScape:
                     other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] += 1  # Increment count if already communicated
                 else:
                     other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] = 1  # Add new target with count 1
+
 
     def add_new_sugar_patch(self):
         max_attempts = 100  
