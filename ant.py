@@ -1,5 +1,3 @@
-# ant.py
-
 import random
 import math
 import pygame
@@ -19,6 +17,8 @@ class Ant:
         self.lifespan = 0
         self.next_target_selection_time = pygame.time.get_ticks() + TARGET_SELECTION_INTERVAL  # Initialize the time for the first target selection
         self.communicated_sugar_locations = []  # List to store sugar locations this ant has communicated
+        self.following_true_location = False  # Track if the ant is following a true location
+        self.following_false_location = False  # Track if the ant is following a false location
 
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -41,11 +41,17 @@ class Ant:
         return False
 
     def select_new_target(self):
-        print("new target selected")
         if self.communicated_targets:
-            self.target = random.choice(self.communicated_targets)
+            target_info = random.choice(self.communicated_targets)
+            self.target = target_info[:2]
+            if target_info[2] == "true":
+                self.following_true_location = True
+                self.following_false_location = False
+            else:
+                self.following_true_location = False
+                self.following_false_location = True
 
-    def move(self, sugar_patches):
+    def move(self, sugar_patches, sugarscape):
         current_time = pygame.time.get_ticks()
 
         # Detect sugar and set target if available and needed
@@ -57,6 +63,12 @@ class Ant:
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target()
+                    # Determine if the selection is true or false
+                    if self.following_true_location:
+                        sugarscape.true_positives += 1
+                    elif self.following_false_location:
+                        sugarscape.false_positives += 1
+
                 self.next_target_selection_time += TARGET_SELECTION_INTERVAL
 
         # Move towards the target if one is selected
