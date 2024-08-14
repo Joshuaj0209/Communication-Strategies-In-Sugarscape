@@ -22,6 +22,7 @@ class Ant:
 
         # Use a normal distribution for the first target selection interval
         self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
+        self.next_target_selection_time = pygame.time.get_ticks() + self.target_selection_interval
 
         self.communicated_sugar_locations = []  # List to store sugar locations this ant has communicated
         self.following_true_location = False  # Track if the ant is following a true location
