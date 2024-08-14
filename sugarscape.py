@@ -21,13 +21,20 @@ class SugarScape:
 
     def initialize_sugar_patches(self):
         patches = []
-        grid_size = int(math.sqrt(SUGAR_MAX))  
+        grid_size = int(math.sqrt(SUGAR_MAX))
         half_grid = grid_size // 2
+        
         for (x, y) in self.sugar_spots:
+            # Calculate the center of the patch
+            center_x = x
+            center_y = y
+            
             for n in range(SUGAR_MAX):
                 square_x = x + (n % grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
                 square_y = y + (n // grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
-                patches.append([square_x, square_y, True])
+                # Store the sugar location along with the center of the patch
+                patches.append([square_x, square_y, True, (center_x, center_y)])
+        
         return patches
 
     def update(self):
@@ -38,21 +45,21 @@ class SugarScape:
             if ant.is_alive():
                 ant.move(self.sugar_patches)
 
-                # The rest of the code remains the same...
                 for sugar in self.sugar_patches:
-                    if sugar[2]:
+                    if sugar[2]:  # Check if sugar is available
                         dx = sugar[0] - ant.x
                         dy = sugar[1] - ant.y
                         dist = math.sqrt(dx ** 2 + dy ** 2)
                         if dist < SUGAR_RADIUS and ant.needs_to_eat():
-                            sugar[2] = False
+                            sugar[2] = False  # Mark sugar as consumed
                             self.consumed_sugar_count += 1
                             ant.eat_sugar()
-                            self.broadcast_sugar_location(ant, sugar[0], sugar[1])
+                            # Pass the patch center to broadcast_sugar_location
+                            self.broadcast_sugar_location(ant, sugar[0], sugar[1], sugar[3])
                             break
                 
                 if ant == self.false_broadcaster and current_time >= self.broadcast_time:
-                    self.broadcast_sugar_location(ant, None, None, false_location=True)
+                    self.broadcast_sugar_location(ant, None, None, None, false_location=True)
                     self.broadcast_time += 10000
 
                 alive_ants.append(ant)
@@ -62,22 +69,27 @@ class SugarScape:
 
         self.ants = alive_ants
 
-        # Check if it's time to add a new sugar patch
         if current_time >= self.next_sugar_time:
             self.add_new_sugar_patch()
             self.next_sugar_time += NEW_SUGAR_INTERVAL
 
-    def broadcast_sugar_location(self, ant, sugar_x, sugar_y, false_location=False):
+            # Check if it's time to add a new sugar patch
+            if current_time >= self.next_sugar_time:
+                self.add_new_sugar_patch()
+                self.next_sugar_time += NEW_SUGAR_INTERVAL
+
+    def broadcast_sugar_location(self, ant, sugar_x, sugar_y, patch_center, false_location=False):
         if false_location:
             broadcast_x = random.randint(0, GAME_WIDTH)
             broadcast_y = random.randint(0, HEIGHT)
         else:
+            # Communicate the center of the patch
+            broadcast_x, broadcast_y = patch_center
+            
             # Check if the ant has already communicated this sugar patch
-            for loc in ant.communicated_sugar_locations:
-                if math.sqrt((loc[0] - sugar_x) ** 2 + (loc[1] - sugar_y) ** 2) < PATCH_RADIUS:
-                    return  # The ant has already communicated this sugar patch
-
-            broadcast_x, broadcast_y = sugar_x, sugar_y
+            if (broadcast_x, broadcast_y) in ant.communicated_sugar_locations:
+                return  # The ant has already communicated this patch
+            
             ant.communicated_sugar_locations.append((broadcast_x, broadcast_y))  # Mark this location as communicated by the ant
 
         for other_ant in self.ants:
@@ -105,10 +117,15 @@ class SugarScape:
             too_close = any(math.sqrt((x - sugar[0]) ** 2 + (y - sugar[1]) ** 2) < min_distance for sugar in self.sugar_patches)
             
             if not too_close:
+                # Calculate the center of the patch
+                center_x = x
+                center_y = y
+                
                 for n in range(SUGAR_MAX):
                     square_x = x + (n % grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
                     square_y = y + (n // grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
-                    self.sugar_patches.append([square_x, square_y, True])
+                    # Store the sugar location along with the center of the patch
+                    self.sugar_patches.append([square_x, square_y, True, (center_x, center_y)])
                 break
 
     def draw(self, screen):
