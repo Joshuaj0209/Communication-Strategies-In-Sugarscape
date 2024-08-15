@@ -28,6 +28,7 @@ class Ant:
         self.following_true_location = False  # Track if the ant is following a true location
         self.following_false_location = False  # Track if the ant is following a false location
         self.confirmed_false_locations = []  # List to store confirmed false locations
+        self.confirmed_true_locations = []  # List to store confirmed true locations
 
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -55,8 +56,8 @@ class Ant:
             best_score = -float('inf')  # Start with the lowest possible score
 
             for (target_info, count) in self.communicated_targets.items():
-                # Skip confirmed false locations
-                if target_info[:2] in self.confirmed_false_locations:
+                # Skip confirmed false or true locations
+                if target_info[:2] in self.confirmed_false_locations or target_info[:2] in self.confirmed_true_locations:
                     continue
 
                 # Calculate the distance to the target
@@ -74,7 +75,7 @@ class Ant:
                 if self.health > health_depletion:
                     # Calculate the score for this target
                     # The score is higher for targets that are closer and have been communicated more often
-                    score = count / (distance**2 + 1)  # +1 to avoid division by zero
+                    score = count / (distance**3 + 1)  # +1 to avoid division by zero
 
                     if score > best_score:
                         best_score = score
@@ -118,7 +119,7 @@ class Ant:
                         sugarscape.true_negatives += 1
 
                 # Generate a new target selection interval based on a normal distribution
-                self.target_selection_interval = max(500, random.gauss(TARGET_SELECTION_INTERVAL, TARGET_SELECTION_INTERVAL / 4))
+                self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
                 self.next_target_selection_time += self.target_selection_interval
 
         # Move towards the target if one is selected
@@ -130,8 +131,16 @@ class Ant:
             if distance < ANT_SPEED:
                 self.x, self.y = self.target
                 # Check if the target was false and add it to confirmed_false_locations
-                if not self.following_true_location:
+                if self.following_false_location:
                     self.confirmed_false_locations.append(self.target)
+                elif self.following_true_location:
+                    self.confirmed_true_locations.append(self.target)
+                
+                # Remove the target from communicated_targets
+                target_key = (self.target[0], self.target[1], "false" if self.following_false_location else "true")
+                if target_key in self.communicated_targets:
+                    del self.communicated_targets[target_key]
+
                 self.target = None
             else:
                 self.direction = math.atan2(dy, dx)
