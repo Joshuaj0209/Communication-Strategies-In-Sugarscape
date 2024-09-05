@@ -31,7 +31,9 @@ class Ant:
         self.confirmed_true_locations = []  # List to store confirmed true locations
 
         self.sugarscape = None  # Reference to the Sugarscape instance
-
+        self.false_broadcast_location = None  # Store the current false location being broadcast
+        self.target_patch_center = None  # Store the center of the sugar patch for broadcasting
+        
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
         closest_distance = float('inf')
@@ -48,6 +50,8 @@ class Ant:
 
         if closest_sugar and self.needs_to_eat():
             self.target = (closest_sugar[0], closest_sugar[1])
+            # Set the target patch center for broadcasting
+            self.target_patch_center = closest_sugar[3]  # Use the center of the sugar patch
             return True
         
         return False
@@ -92,24 +96,27 @@ class Ant:
                     self.following_true_location = False
                     self.following_false_location = True
 
-                # Broadcast the target if not previously communicated
-                if (self.target[0], self.target[1]) not in self.communicated_sugar_locations:
-                    self.broadcast_sugar_location(self.target[0], self.target[1], self.target, false_location=not self.following_true_location)
-
-    def broadcast_sugar_location(self, sugar_x, sugar_y, patch_center, false_location=False):
+    def broadcast_sugar_location(self, false_location=False):
         if false_location:
-            # If this ant is the designated false broadcaster, generate a new random false location
+            # If this ant is the designated false broadcaster, broadcast the current false location
             if self == self.sugarscape.false_broadcaster:
-                padding = 100  # Padding from the edges to avoid edges
-                broadcast_x = random.randint(padding, GAME_WIDTH - padding)
-                broadcast_y = random.randint(padding, HEIGHT - padding)
+                if not self.false_broadcast_location:
+                    padding = 100
+                    self.false_broadcast_location = (
+                        random.randint(padding, GAME_WIDTH - padding),
+                        random.randint(padding, HEIGHT - padding),
+                    )
+                broadcast_x, broadcast_y = self.false_broadcast_location
             else:
-                # Otherwise, use the false location that the ant received
-                broadcast_x, broadcast_y = sugar_x, sugar_y
+                broadcast_x, broadcast_y = None, None  # Should not happen for non-broadcasters
             location_type = "false"
         else:
-            broadcast_x, broadcast_y = patch_center
-            location_type = "true"
+            if self.target_patch_center:
+                # Broadcast the center of the sugar patch
+                broadcast_x, broadcast_y = self.target_patch_center
+                location_type = "true"
+            else:
+                return  # No target to broadcast
 
         # Check if the sugar location has already been communicated by this ant
         communicated_location_entry = None
@@ -141,7 +148,7 @@ class Ant:
                     # Check if this other ant has already been communicated this location
                     if other_ant not in communicated_location_entry[1]:
                         # Append the other ant to the list of communicated ants for this location
-                        communicated_location_entry[1].append(other_ant) # mutable, therefore updating this also updates the communicated_sugar_location
+                        communicated_location_entry[1].append(other_ant)
 
                         # Update the other ant's communicated targets
                         if (broadcast_x, broadcast_y, location_type) in other_ant.communicated_targets:
@@ -215,6 +222,9 @@ class Ant:
         # Decrease health over time and increase lifespan
         self.health -= HEALTH_DECREASE_RATE
         self.lifespan += 1
+
+        self.broadcast_sugar_location(false_location=self == self.sugarscape.false_broadcaster)
+
 
     def needs_to_eat(self):
         return self.health < self.initial_health

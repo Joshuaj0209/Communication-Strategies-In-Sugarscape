@@ -74,14 +74,12 @@ class SugarScape:
                             self.consumed_sugar_count += 1
                             ant.eat_sugar()
                             # Ant broadcasts sugar location, handled within the Ant class
-                            ant.broadcast_sugar_location(sugar[0], sugar[1], sugar[3])
-                            break
+                            ant.broadcast_sugar_location()
                 
                 # False broadcaster logic
                 if ant == self.false_broadcaster and current_time >= self.broadcast_time:
-                    # False broadcaster communicates false location
-                    ant.broadcast_sugar_location(None, None, None, false_location=True)
-                    self.broadcast_time += 10000
+                    ant.false_broadcast_location = None  # Reset for new false location
+                    self.broadcast_time += 10000  # Reset interval
 
                 alive_ants.append(ant)
             else:
