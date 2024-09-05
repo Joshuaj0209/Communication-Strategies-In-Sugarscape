@@ -9,12 +9,13 @@ class SugarScape:
         padding = 120  # Padding from the edges
         patch_size = int(math.sqrt(SUGAR_MAX)) * SQUARE_SIZE  # Size of the entire sugar patch
 
-        # Top left and top right sugar patches with padding
+        # Top left and bottom right sugar patches with padding
         self.sugar_spots = [
             (padding + patch_size // 2, padding + patch_size // 2),  # Top left
             (GAME_WIDTH - padding - patch_size // 2, HEIGHT - padding - patch_size // 2)  # Bottom right
         ]
 
+        # Initialize ants
         self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT)) for _ in range(NUM_ANTS)]
         self.sugar_patches = self.initialize_sugar_patches()
         self.consumed_sugar_count = 0
@@ -22,13 +23,20 @@ class SugarScape:
         self.next_sugar_time = pygame.time.get_ticks() + NEW_SUGAR_INTERVAL
         self.communicated_locations = {}  # Store locations with their communication counts
         self.total_lifespan_of_dead_ants = 0
+
+        # Choose a false broadcaster ant
         self.false_broadcaster = random.choice(self.ants)
         self.broadcast_time = pygame.time.get_ticks() + 1000
 
+        # Tracking statistics for positive/negative broadcasts
         self.true_positives = 0
         self.true_negatives = 0
         self.false_positives = 0
         self.false_negatives = 0
+
+        # Provide each ant with a reference to the Sugarscape instance
+        for ant in self.ants:
+            ant.sugarscape = self
 
     def initialize_sugar_patches(self):
         patches = []
@@ -65,12 +73,14 @@ class SugarScape:
                             sugar[2] = False  # Mark sugar as consumed
                             self.consumed_sugar_count += 1
                             ant.eat_sugar()
-                            # Pass the patch center to broadcast_sugar_location
-                            self.broadcast_sugar_location(ant, sugar[0], sugar[1], sugar[3])
+                            # Ant broadcasts sugar location, handled within the Ant class
+                            ant.broadcast_sugar_location(sugar[0], sugar[1], sugar[3])
                             break
                 
+                # False broadcaster logic
                 if ant == self.false_broadcaster and current_time >= self.broadcast_time:
-                    self.broadcast_sugar_location(ant, None, None, None, false_location=True)
+                    # False broadcaster communicates false location
+                    ant.broadcast_sugar_location(None, None, None, false_location=True)
                     self.broadcast_time += 10000
 
                 alive_ants.append(ant)
@@ -83,47 +93,6 @@ class SugarScape:
         if current_time >= self.next_sugar_time:
             self.add_new_sugar_patch()
             self.next_sugar_time += NEW_SUGAR_INTERVAL
-
-    def broadcast_sugar_location(self, ant, sugar_x, sugar_y, patch_center, false_location=False):
-        if false_location:
-            # If the ant is the designated false broadcaster, generate a new random false location.
-            if ant == self.false_broadcaster:
-                padding = 100  # Padding from the edges to avoid edges
-                broadcast_x = random.randint(padding, GAME_WIDTH - padding)
-                broadcast_y = random.randint(padding, HEIGHT - padding)
-            else:
-                # Otherwise, use the false location that the ant actually selected.
-                broadcast_x, broadcast_y = sugar_x, sugar_y
-            location_type = "false"
-        else:
-            broadcast_x, broadcast_y = patch_center
-            location_type = "true"
-            
-            if (broadcast_x, broadcast_y) in ant.communicated_sugar_locations:
-                return  # The ant has already communicated this patch
-            
-            ant.communicated_sugar_locations.append((broadcast_x, broadcast_y))  # Mark this location as communicated by the ant
-
-        # Update the communication count for this location
-        if (broadcast_x, broadcast_y) in self.communicated_locations:
-            self.communicated_locations[(broadcast_x, broadcast_y)] += 1
-        else:
-            self.communicated_locations[(broadcast_x, broadcast_y)] = 1
-
-        # Broadcast to ants within the communication radius
-        for other_ant in self.ants:
-            if other_ant != ant:
-                dx = other_ant.x - ant.x
-                dy = other_ant.y - ant.y
-                dist = math.sqrt(dx ** 2 + dy ** 2)
-                
-                # Only communicate if the other ant is within the communication radius
-                if dist <= COMMUNICATION_RADIUS:
-                    if (broadcast_x, broadcast_y, location_type) in other_ant.communicated_targets:
-                        other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] += 1  # Increment count if already communicated
-                    else:
-                        other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] = 1  # Add new target with count 1
-
 
     def add_new_sugar_patch(self):
         max_attempts = 100  
@@ -176,7 +145,5 @@ class SugarScape:
             'Dead Ants': self.dead_ants_count,
             'Average Lifespan': average_lifespan,
             'True Positives': self.true_positives,
-            # 'True Negatives': self.true_negatives,
             'False Positives': self.false_positives,
-            # 'False Negatives': self.false_negatives,
         }

@@ -30,6 +30,9 @@ class Ant:
         self.confirmed_false_locations = []  # List to store confirmed false locations
         self.confirmed_true_locations = []  # List to store confirmed true locations
 
+        self.communicated_targets = {}  # Dictionary to store communicated locations and their counts
+        self.sugarscape = None  # Reference to the Sugarscape instance
+
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
         closest_distance = float('inf')
@@ -92,8 +95,48 @@ class Ant:
 
                 # Broadcast the target if not previously communicated
                 if (self.target[0], self.target[1]) not in self.communicated_sugar_locations:
-                    sugarscape.broadcast_sugar_location(self, self.target[0], self.target[1], self.target, false_location=not self.following_true_location)
+                    self.broadcast_sugar_location(self.target[0], self.target[1], self.target, false_location=not self.following_true_location)
 
+    def broadcast_sugar_location(self, sugar_x, sugar_y, patch_center, false_location=False):
+        if false_location:
+            # If this ant is the designated false broadcaster, generate a new random false location
+            if self == self.sugarscape.false_broadcaster:
+                padding = 100  # Padding from the edges to avoid edges
+                broadcast_x = random.randint(padding, GAME_WIDTH - padding)
+                broadcast_y = random.randint(padding, HEIGHT - padding)
+            else:
+                # Otherwise, use the false location that the ant received
+                broadcast_x, broadcast_y = sugar_x, sugar_y
+            location_type = "false"
+        else:
+            broadcast_x, broadcast_y = patch_center
+            location_type = "true"
+            
+            if (broadcast_x, broadcast_y) in self.communicated_sugar_locations:
+                return  # The ant has already communicated this patch
+            
+            self.communicated_sugar_locations.append((broadcast_x, broadcast_y))  # Mark this location as communicated by the ant
+
+        # Update the communication count for this location in Sugarscape
+        if (broadcast_x, broadcast_y) in self.sugarscape.communicated_locations:
+            self.sugarscape.communicated_locations[(broadcast_x, broadcast_y)] += 1
+        else:
+            self.sugarscape.communicated_locations[(broadcast_x, broadcast_y)] = 1
+
+        # Broadcast to other ants within the communication radius
+        for other_ant in self.sugarscape.ants:
+            if other_ant != self:
+                dx = other_ant.x - self.x
+                dy = other_ant.y - self.y
+                dist = math.sqrt(dx ** 2 + dy ** 2)
+                
+                # Only communicate if the other ant is within the communication radius
+                if dist <= COMMUNICATION_RADIUS:
+                    if (broadcast_x, broadcast_y, location_type) in other_ant.communicated_targets:
+                        other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] += 1  # Increment count if already communicated
+                    else:
+                        other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] = 1  # Add new target with count 1
+    
     def move(self, sugar_patches, sugarscape):
         current_time = pygame.time.get_ticks()
 
