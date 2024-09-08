@@ -98,8 +98,8 @@ class Ant:
 
     def broadcast_sugar_location(self, false_location=False):
         if false_location:
-            # If this ant is the designated false broadcaster, broadcast the current false location
-            if self == self.sugarscape.false_broadcaster:
+            # If this ant is one of the designated false broadcasters, broadcast the current false location
+            if self in self.sugarscape.false_broadcasters:
                 if not self.false_broadcast_location:
                     padding = 100
                     self.false_broadcast_location = (
@@ -223,8 +223,8 @@ class Ant:
         self.health -= HEALTH_DECREASE_RATE
         self.lifespan += 1
 
-        self.broadcast_sugar_location(false_location=self == self.sugarscape.false_broadcaster)
-
+        # Broadcast sugar or false location
+        self.broadcast_sugar_location(false_location=self in self.sugarscape.false_broadcasters)
 
     def needs_to_eat(self):
         return self.health < self.initial_health

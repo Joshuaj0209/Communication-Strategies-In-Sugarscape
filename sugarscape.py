@@ -24,8 +24,8 @@ class SugarScape:
         self.communicated_locations = {}  # Store locations with their communication counts
         self.total_lifespan_of_dead_ants = 0
 
-        # Choose a false broadcaster ant
-        self.false_broadcaster = random.choice(self.ants)
+        # Choose two false broadcaster ants
+        self.false_broadcasters = random.sample(self.ants, 2)
         self.broadcast_time = pygame.time.get_ticks() + 1000
 
         # Tracking statistics for positive/negative broadcasts
@@ -76,8 +76,8 @@ class SugarScape:
                             # Ant broadcasts sugar location, handled within the Ant class
                             ant.broadcast_sugar_location()
                 
-                # False broadcaster logic
-                if ant == self.false_broadcaster and current_time >= self.broadcast_time:
+                # False broadcaster logic for both false broadcasters
+                if ant in self.false_broadcasters and current_time >= self.broadcast_time:
                     ant.false_broadcast_location = None  # Reset for new false location
                     self.broadcast_time += 10000  # Reset interval
 
@@ -119,19 +119,30 @@ class SugarScape:
 
     def draw(self, screen):
         screen.fill(WHITE)
+        
+        # Draw the sugar patches
         for sugar in self.sugar_patches:
             if sugar[2]:
                 pygame.draw.rect(screen, GREEN, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
             else:
                 pygame.draw.rect(screen, YELLOW, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
+        
+        # Draw ants and their communication radius
         for ant in self.ants:
-            color = GREEN if ant == self.false_broadcaster else RED
+            # Draw the communication radius as a circle around the ant
+            pygame.draw.circle(screen, (135, 206, 235, 128), (int(ant.x), int(ant.y)), COMMUNICATION_RADIUS, 1)  # Light blue, semi-transparent
+            
+            # Draw the ant itself
+            color = GREEN if ant in self.false_broadcasters else RED
             pygame.draw.circle(screen, color, (int(ant.x), int(ant.y)), ANT_SIZE)
+        
+        # Draw communicated locations (for visualization)
         for loc, count in self.communicated_locations.items():
             base_intensity = 150  # Start with darker red 
             color_intensity = max(0, base_intensity - count * 40)  # Decrease intensity by 20 per communication
             color = (255, color_intensity, color_intensity)  # Darken red progressively
             pygame.draw.rect(screen, color, (loc[0], loc[1], SQUARE_SIZE, SQUARE_SIZE))
+
 
     def get_analytics_data(self):
         average_lifespan = self.total_lifespan_of_dead_ants / self.dead_ants_count if self.dead_ants_count > 0 else 0
