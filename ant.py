@@ -57,44 +57,63 @@ class Ant:
         return False
 
     def select_new_target(self, sugarscape):
-        if self.communicated_targets:
-            best_target = None
-            best_score = -float('inf')  # Start with the lowest possible score
+        # Calculate the maximum distance the ant can travel with its current health
+        max_distance = self.health / HEALTH_DECREASE_RATE * ANT_SPEED
 
-            for (target_info, count) in self.communicated_targets.items():
-                # Skip confirmed false or true locations
-                if target_info[:2] in self.confirmed_false_locations or target_info[:2] in self.confirmed_true_locations:
-                    continue
+        viable_targets = []
+        total_weight = 0
 
-                # Calculate the distance to the target
-                dx = target_info[0] - self.x
-                dy = target_info[1] - self.y
-                distance = math.sqrt(dx**2 + dy**2)
+        # Evaluate all communicated targets
+        for target_info, count in self.communicated_targets.items():
+            if target_info[:2] in self.confirmed_false_locations or target_info[:2] in self.confirmed_true_locations:
+                continue
 
-                # Estimate the time to reach the target
-                time_to_reach = distance / ANT_SPEED
+            # Calculate distance to target
+            dx = target_info[0] - self.x
+            dy = target_info[1] - self.y
+            distance = math.sqrt(dx**2 + dy**2)
 
-                # Estimate health depletion over that time
-                health_depletion = time_to_reach * HEALTH_DECREASE_RATE
+            # Check if the target is within reach
+            if distance <= max_distance:
+                # Calculate weighted score (exploitation)
+                score = count / (distance**2 + 1)
+                viable_targets.append((target_info, score))
+                total_weight += score
 
-                # Check if the ant can reach the target before dying
-                if self.health > health_depletion:
-                    # Calculate the score for this target
-                    # The score is higher for targets that are closer and have been communicated more often
-                    score = count / (distance**3 + 1)  # +1 to avoid division by zero
+        # If there are viable targets, exploit (weighted target selection)
+        if viable_targets:
+            rand_value = random.uniform(0, total_weight)
+            cumulative_weight = 0
+            for target_info, weight in viable_targets:
+                cumulative_weight += weight
+                if rand_value <= cumulative_weight:
+                    self.target = target_info[:2]
+                    self.following_true_location = target_info[2] == "true"
+                    self.following_false_location = target_info[2] == "false"
 
-                    if score > best_score:
-                        best_score = score
-                        best_target = target_info
+                    # Increment the exploit count
+                    sugarscape.exploit_count += 1
+                    
+                    # Increment false positives if the target is false, true positives if true
+                    if self.following_false_location:
+                        sugarscape.false_positives += 1
+                    elif self.following_true_location:
+                        sugarscape.true_positives += 1
+                    return  # Target selected, exit the function
 
-            if best_target:
-                self.target = best_target[:2]
-                if best_target[2] == "true":
-                    self.following_true_location = True
-                    self.following_false_location = False
-                else:
-                    self.following_true_location = False
-                    self.following_false_location = True
+        # If no viable targets, explore (fallback strategy)
+        # Exploration will select a random point in the environment
+        self.explore()
+        # Increment the explore count
+        sugarscape.explore_count += 1
+
+    def explore(self):
+        # Exploration logic: move randomly within the environment
+        self.target = (random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT))
+        self.following_true_location = False  # Not following a true or false location
+        self.following_false_location = False
+
+
 
     def broadcast_sugar_location(self, false_location=False):
         if false_location:
@@ -169,11 +188,6 @@ class Ant:
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
-                    # Determine if the selection is true or false
-                    if self.following_true_location:
-                        sugarscape.true_positives += 1
-                    elif self.following_false_location:
-                        sugarscape.false_positives += 1
                 else:
                     # No target selected means the ant denied all locations
                     if self.following_true_location:

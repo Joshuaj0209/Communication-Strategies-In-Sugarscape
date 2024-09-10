@@ -34,6 +34,9 @@ class SugarScape:
         self.false_positives = 0
         self.false_negatives = 0
 
+        self.explore_count = 0
+        self.exploit_count = 0
+
         # Provide each ant with a reference to the Sugarscape instance
         for ant in self.ants:
             ant.sugarscape = self
@@ -155,4 +158,6 @@ class SugarScape:
             'Average Lifespan': average_lifespan,
             'True Positives': self.true_positives,
             'False Positives': self.false_positives,
+            'Exploits': self.exploit_count,
+            'Explores': self.explore_count
         }
