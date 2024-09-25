@@ -13,7 +13,7 @@ class Ant:
         self.initial_health = INITIAL_HEALTH
         self.max_health = MAX_HEALTH
         self.target = None
-        self.communicated_targets = {}  # Dictionary to store communicated locations and their counts
+        self.communicated_targets = {}  # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count}
         self.lifespan = 0
 
         # Set the mean and standard deviation for the target selection interval
@@ -57,55 +57,43 @@ class Ant:
         return False
 
     def select_new_target(self, sugarscape):
-        # Calculate the maximum distance the ant can travel with its current health
         max_distance = self.health / HEALTH_DECREASE_RATE * ANT_SPEED
 
         viable_targets = []
         total_weight = 0
 
-        # Evaluate all communicated targets
-        for target_info, count in self.communicated_targets.items():
-            if target_info[:2] in self.confirmed_false_locations or target_info[:2] in self.confirmed_true_locations:
+        for location, counts in self.communicated_targets.items():
+            if location in self.confirmed_false_locations or location in self.confirmed_true_locations:
                 continue
 
-            # Calculate distance to target
-            dx = target_info[0] - self.x
-            dy = target_info[1] - self.y
+            dx = location[0] - self.x
+            dy = location[1] - self.y
             distance = math.sqrt(dx**2 + dy**2)
 
-            # Check if the target is within reach
             if distance <= max_distance:
-                # Calculate weighted score (exploitation)
-                score = count / (distance**2 + 1)
-                viable_targets.append((target_info, score))
+                confirmed = counts.get('confirmed', 0)
+                accepted = counts.get('accepted', 0)
+                rejected = counts.get('rejected', 0)
+
+                score = (confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)
+                viable_targets.append((location, score))
                 total_weight += score
 
-        # If there are viable targets, exploit (weighted target selection)
         if viable_targets:
             rand_value = random.uniform(0, total_weight)
             cumulative_weight = 0
-            for target_info, weight in viable_targets:
+            for location, weight in viable_targets:
                 cumulative_weight += weight
                 if rand_value <= cumulative_weight:
-                    self.target = target_info[:2]
-                    self.following_true_location = target_info[2] == "true"
-                    self.following_false_location = target_info[2] == "false"
-
-                    # Increment the exploit count
+                    self.target = location
                     sugarscape.exploit_count += 1
-                    
-                    # Increment false positives if the target is false, true positives if true
-                    if self.following_false_location:
-                        sugarscape.false_positives += 1
-                    elif self.following_true_location:
-                        sugarscape.true_positives += 1
-                    return  # Target selected, exit the function
+                    self.broadcast_sugar_location('accepted')
+                    return
 
-        # If no viable targets, explore (fallback strategy)
-        # Exploration will select a random point in the environment
+        # If there are no viable targets, explore
         self.explore()
-        # Increment the explore count
         sugarscape.explore_count += 1
+
 
     def explore(self):
         # Exploration logic: move randomly within the environment
@@ -115,9 +103,8 @@ class Ant:
 
 
 
-    def broadcast_sugar_location(self, false_location=False):
+    def broadcast_sugar_location(self, characteristic, false_location=False):
         if false_location:
-            # If this ant is one of the designated false broadcasters, broadcast the current false location
             if self in self.sugarscape.false_broadcasters:
                 if not self.false_broadcast_location:
                     padding = 100
@@ -127,33 +114,16 @@ class Ant:
                     )
                 broadcast_x, broadcast_y = self.false_broadcast_location
             else:
-                broadcast_x, broadcast_y = None, None  # Should not happen for non-broadcasters
-            location_type = "false"
+                return  # Non-false broadcasters should not broadcast false locations
         else:
             if self.target_patch_center:
-                # Broadcast the center of the sugar patch
                 broadcast_x, broadcast_y = self.target_patch_center
-                location_type = "true"
+            elif self.target:
+                broadcast_x, broadcast_y = self.target
             else:
-                return  # No target to broadcast
+                return  # No valid location to broadcast
 
-        # Check if the sugar location has already been communicated by this ant
-        communicated_location_entry = None
-        for loc, ants in self.communicated_sugar_locations:
-            if loc == (broadcast_x, broadcast_y):
-                communicated_location_entry = (loc, ants)
-                break
-
-        # If this location hasn't been communicated, add it to the list
-        if communicated_location_entry is None:
-            communicated_location_entry = ((broadcast_x, broadcast_y), [])
-            self.communicated_sugar_locations.append(communicated_location_entry)
-
-        # Update the communication count for this location in Sugarscape
-        if (broadcast_x, broadcast_y) in self.sugarscape.communicated_locations:
-            self.sugarscape.communicated_locations[(broadcast_x, broadcast_y)] += 1
-        else:
-            self.sugarscape.communicated_locations[(broadcast_x, broadcast_y)] = 1
+        location = (broadcast_x, broadcast_y)
 
         # Broadcast to other ants within the communication radius
         for other_ant in self.sugarscape.ants:
@@ -162,44 +132,33 @@ class Ant:
                 dy = other_ant.y - self.y
                 dist = math.sqrt(dx ** 2 + dy ** 2)
 
-                # Only communicate if the other ant is within the communication radius
                 if dist <= COMMUNICATION_RADIUS:
-                    # Check if this other ant has already been communicated this location
-                    if other_ant not in communicated_location_entry[1]:
-                        # Append the other ant to the list of communicated ants for this location
-                        communicated_location_entry[1].append(other_ant)
-
-                        # Update the other ant's communicated targets
-                        if (broadcast_x, broadcast_y, location_type) in other_ant.communicated_targets:
-                            other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] += 1  # Increment count if already communicated
+                    if location in other_ant.communicated_targets:
+                        if characteristic in other_ant.communicated_targets[location]:
+                            other_ant.communicated_targets[location][characteristic] += 1
                         else:
-                            other_ant.communicated_targets[(broadcast_x, broadcast_y, location_type)] = 1  # Add new target with count 1
+                            other_ant.communicated_targets[location][characteristic] = 1
+                    else:
+                        other_ant.communicated_targets[location] = {characteristic: 1}
+        
 
     
     def move(self, sugar_patches, sugarscape):
         current_time = pygame.time.get_ticks()
 
-        # Detect sugar and set target if available and needed
         sugar_detected = self.detect_sugar(sugar_patches)
-        
-        # If no sugar detected and the ant needs to eat, check for communicated targets
+
         if not sugar_detected and not self.target and self.needs_to_eat():
-            # Check if it's time to select a new target
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
                 else:
-                    # No target selected means the ant denied all locations
-                    if self.following_true_location:
-                        sugarscape.false_negatives += 1
-                    elif self.following_false_location:
-                        sugarscape.true_negatives += 1
-
-                # Generate a new target selection interval based on a normal distribution
+                    # No viable targets; explore
+                    self.explore()
+                    sugarscape.explore_count += 1
                 self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
                 self.next_target_selection_time += self.target_selection_interval
 
-        # Move towards the target if one is selected
         if self.target:
             dx = self.target[0] - self.x
             dy = self.target[1] - self.y
@@ -207,38 +166,53 @@ class Ant:
 
             if distance < ANT_SPEED:
                 self.x, self.y = self.target
-                # Check if the target was false and add it to confirmed_false_locations
-                if self.following_false_location:
-                    self.confirmed_false_locations.append(self.target)
-                elif self.following_true_location:
+                found_sugar = any(
+                    sugar[2] and math.hypot(sugar[0] - self.x, sugar[1] - self.y) < SUGAR_RADIUS
+                    for sugar in self.sugarscape.sugar_patches
+                )
+
+                if found_sugar:
                     self.confirmed_true_locations.append(self.target)
-                
-                # Remove the target from communicated_targets
-                target_key = (self.target[0], self.target[1], "false" if self.following_false_location else "true")
-                if target_key in self.communicated_targets:
-                    del self.communicated_targets[target_key]
+                    self.broadcast_sugar_location('confirmed')
+
+                    # Handle sugar consumption
+                    if self.needs_to_eat():
+                        for sugar in self.sugarscape.sugar_patches:
+                            if sugar[2] and math.hypot(sugar[0] - self.x, sugar[1] - self.y) < SUGAR_RADIUS:
+                                sugar[2] = False  # Mark sugar as consumed
+                                self.sugarscape.consumed_sugar_count += 1
+                                self.eat_sugar()
+                                break  # Consume only one sugar
+                else:
+                    self.confirmed_false_locations.append(self.target)
+                    self.broadcast_sugar_location('rejected')
 
                 self.target = None
             else:
                 self.direction = math.atan2(dy, dx)
         else:
-            # Continue moving randomly if no target
             self.direction += random.uniform(-self.turn_angle, self.turn_angle)
 
-        # Update the ant's position
         self.x += ANT_SPEED * math.cos(self.direction)
         self.y += ANT_SPEED * math.sin(self.direction)
-
-        # Keep the ant within the game boundaries
         self.x = max(0, min(self.x, GAME_WIDTH))
         self.y = max(0, min(self.y, HEIGHT))
 
-        # Decrease health over time and increase lifespan
         self.health -= HEALTH_DECREASE_RATE
         self.lifespan += 1
 
-        # Broadcast sugar or false location
-        self.broadcast_sugar_location(false_location=self in self.sugarscape.false_broadcasters)
+        # False broadcasters broadcast 'confirmed' false locations
+        if self in self.sugarscape.false_broadcasters:
+            if current_time >= self.sugarscape.broadcast_times[self]:
+                self.false_broadcast_location = None  # Reset for a new false location
+                self.broadcast_sugar_location('confirmed', false_location=True)
+                self.sugarscape.broadcast_times[self] += 10000
+
+        # Regular ants broadcast sugar locations if they have found sugar
+        elif self.target_patch_center:
+            self.broadcast_sugar_location('confirmed')
+
+
 
     def needs_to_eat(self):
         return self.health < self.initial_health

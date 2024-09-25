@@ -26,7 +26,9 @@ class SugarScape:
 
         # Choose two false broadcaster ants
         self.false_broadcasters = random.sample(self.ants, 2)
-        self.broadcast_time = pygame.time.get_ticks() + 1000
+        # Initialize broadcast times for each false broadcaster
+        self.broadcast_times = {ant: pygame.time.get_ticks() + 1000 for ant in self.false_broadcasters}
+
 
         # Tracking statistics for positive/negative broadcasts
         self.true_positives = 0
@@ -66,24 +68,6 @@ class SugarScape:
         for ant in self.ants:
             if ant.is_alive():
                 ant.move(self.sugar_patches, self)
-
-                for sugar in self.sugar_patches:
-                    if sugar[2]:  # Check if sugar is available
-                        dx = sugar[0] - ant.x
-                        dy = sugar[1] - ant.y
-                        dist = math.sqrt(dx ** 2 + dy ** 2)
-                        if dist < SUGAR_RADIUS and ant.needs_to_eat():
-                            sugar[2] = False  # Mark sugar as consumed
-                            self.consumed_sugar_count += 1
-                            ant.eat_sugar()
-                            # Ant broadcasts sugar location, handled within the Ant class
-                            ant.broadcast_sugar_location()
-                
-                # False broadcaster logic for both false broadcasters
-                if ant in self.false_broadcasters and current_time >= self.broadcast_time:
-                    ant.false_broadcast_location = None  # Reset for new false location
-                    self.broadcast_time += 10000  # Reset interval
-
                 alive_ants.append(ant)
             else:
                 self.dead_ants_count += 1
@@ -94,6 +78,8 @@ class SugarScape:
         if current_time >= self.next_sugar_time:
             self.add_new_sugar_patch()
             self.next_sugar_time += NEW_SUGAR_INTERVAL
+
+
 
     def add_new_sugar_patch(self):
         max_attempts = 100  
