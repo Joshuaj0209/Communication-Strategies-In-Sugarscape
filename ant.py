@@ -24,9 +24,6 @@ class Ant:
         self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
         self.next_target_selection_time = pygame.time.get_ticks() + self.target_selection_interval
 
-        self.communicated_sugar_locations = []  # List of tuples: (sugar_location, communicated_ants)
-        self.following_true_location = False  # Track if the ant is following a true location
-        self.following_false_location = False  # Track if the ant is following a false location
         self.confirmed_false_locations = []  # List to store confirmed false locations
         self.confirmed_true_locations = []  # List to store confirmed true locations
 
@@ -94,14 +91,9 @@ class Ant:
         self.explore()
         sugarscape.explore_count += 1
 
-
     def explore(self):
         # Exploration logic: move randomly within the environment
         self.target = (random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT))
-        self.following_true_location = False  # Not following a true or false location
-        self.following_false_location = False
-
-
 
     def broadcast_sugar_location(self, characteristic, false_location=False):
         if false_location:
