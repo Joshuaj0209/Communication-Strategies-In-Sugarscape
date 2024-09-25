@@ -14,6 +14,9 @@ class Ant:
         self.max_health = MAX_HEALTH
         self.target = None
         self.communicated_targets = {}  # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count}
+        self.already_communicated = {}  # Key: (location, characteristic), Value: set of ants
+        self.current_broadcast_characteristic = None  # Track current broadcast characteristic
+
         self.lifespan = 0
 
         # Set the mean and standard deviation for the target selection interval
@@ -116,6 +119,11 @@ class Ant:
                 return  # No valid location to broadcast
 
         location = (broadcast_x, broadcast_y)
+        key = (location, characteristic)
+
+        # Initialize the set if not already done
+        if key not in self.already_communicated:
+            self.already_communicated[key] = set()
 
         # Broadcast to other ants within the communication radius
         for other_ant in self.sugarscape.ants:
@@ -125,13 +133,18 @@ class Ant:
                 dist = math.sqrt(dx ** 2 + dy ** 2)
 
                 if dist <= COMMUNICATION_RADIUS:
-                    if location in other_ant.communicated_targets:
-                        if characteristic in other_ant.communicated_targets[location]:
-                            other_ant.communicated_targets[location][characteristic] += 1
+                    # Check if we have already communicated this location and characteristic to this ant
+                    if other_ant not in self.already_communicated[key]:
+                        # Update the other ant's communicated targets
+                        if location in other_ant.communicated_targets:
+                            if characteristic in other_ant.communicated_targets[location]:
+                                other_ant.communicated_targets[location][characteristic] += 1
+                            else:
+                                other_ant.communicated_targets[location][characteristic] = 1
                         else:
-                            other_ant.communicated_targets[location][characteristic] = 1
-                    else:
-                        other_ant.communicated_targets[location] = {characteristic: 1}
+                            other_ant.communicated_targets[location] = {characteristic: 1}
+                        # Mark that we have communicated this to the other ant
+                        self.already_communicated[key].add(other_ant)
         
 
     
@@ -140,6 +153,52 @@ class Ant:
 
         sugar_detected = self.detect_sugar(sugar_patches)
 
+        # Store the previous broadcast characteristic and location
+        previous_characteristic = self.current_broadcast_characteristic
+        previous_location = self.target if self.target else getattr(self, 'last_location', None)
+
+        # Ant continuously broadcasts its current target location or last known location
+        if self.target or getattr(self, 'last_location', None):
+            if self.target:
+                location = self.target
+            else:
+                location = self.last_location
+
+            if location in self.confirmed_true_locations:
+                self.current_broadcast_characteristic = 'confirmed'
+            elif location in self.confirmed_false_locations:
+                self.current_broadcast_characteristic = 'rejected'
+            else:
+                self.current_broadcast_characteristic = 'accepted'
+
+            # If the characteristic or location has changed, reset communication tracking
+            if (self.current_broadcast_characteristic != previous_characteristic or
+                    location != previous_location):
+                key = (location, previous_characteristic)
+                if key in self.already_communicated:
+                    del self.already_communicated[key]
+
+            self.broadcast_sugar_location(self.current_broadcast_characteristic)
+        else:
+            # If the ant has no target or last location, reset the current broadcast characteristic
+            self.current_broadcast_characteristic = None
+
+        # False broadcasters continuously broadcast their false location
+        if self in self.sugarscape.false_broadcasters:
+            if current_time >= self.sugarscape.broadcast_times[self]:
+                # Reset communication for the old false location
+                if self.false_broadcast_location:
+                    key = (self.false_broadcast_location, 'confirmed')
+                    if key in self.already_communicated:
+                        del self.already_communicated[key]
+                self.false_broadcast_location = None  # Reset for a new false location
+                self.sugarscape.broadcast_times[self] += 10000
+            self.broadcast_sugar_location('confirmed', false_location=True)
+
+        # Before moving, store the previous target
+        previous_target = self.target
+
+        # Movement logic that might change self.target
         if not sugar_detected and not self.target and self.needs_to_eat():
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
@@ -165,8 +224,7 @@ class Ant:
 
                 if found_sugar:
                     self.confirmed_true_locations.append(self.target)
-                    self.broadcast_sugar_location('confirmed')
-
+                    # The broadcast has already been handled above
                     # Handle sugar consumption
                     if self.needs_to_eat():
                         for sugar in self.sugarscape.sugar_patches:
@@ -177,9 +235,11 @@ class Ant:
                                 break  # Consume only one sugar
                 else:
                     self.confirmed_false_locations.append(self.target)
-                    self.broadcast_sugar_location('rejected')
+                    # The broadcast has already been handled above
 
-                self.target = None
+                # After reaching the target, store it as last_location
+                self.last_location = self.target
+                self.target = None  # Clear the target after reaching it
             else:
                 self.direction = math.atan2(dy, dx)
         else:
@@ -193,16 +253,13 @@ class Ant:
         self.health -= HEALTH_DECREASE_RATE
         self.lifespan += 1
 
-        # False broadcasters broadcast 'confirmed' false locations
-        if self in self.sugarscape.false_broadcasters:
-            if current_time >= self.sugarscape.broadcast_times[self]:
-                self.false_broadcast_location = None  # Reset for a new false location
-                self.broadcast_sugar_location('confirmed', false_location=True)
-                self.sugarscape.broadcast_times[self] += 10000
-
-        # Regular ants broadcast sugar locations if they have found sugar
-        elif self.target_patch_center:
-            self.broadcast_sugar_location('confirmed')
+        # If the target has changed, reset communication tracking
+        if self.target != previous_target:
+            if previous_target:
+                keys_to_remove = [key for key in self.already_communicated if key[0] == previous_target]
+                for key in keys_to_remove:
+                    del self.already_communicated[key]
+            # Do not reset current_broadcast_characteristic here, since we continue broadcasting after reaching the target
 
 
 
