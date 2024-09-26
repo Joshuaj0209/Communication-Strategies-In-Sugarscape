@@ -95,7 +95,7 @@ class Ant:
                     # Check if the accepted location is true or false
                     if location in [patch[3] for patch in sugarscape.sugar_patches if patch[2]]:
                         sugarscape.true_positives += 1
-                    elif location in sugarscape.false_broadcasters_locations:
+                    elif location in sugarscape.historical_false_locations:
                         sugarscape.false_positives += 1
                     return
 
