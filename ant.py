@@ -35,6 +35,9 @@ class Ant:
         self.target_patch_center = None  # Store the center of the sugar patch for broadcasting
 
         self.is_exploring_target = False  # Flag to track if the target was chosen by exploring
+
+        # Track false locations created by this ant if it is a false broadcaster
+        self.own_false_locations = set()
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -65,6 +68,11 @@ class Ant:
         total_weight = 0
 
         for location, counts in self.communicated_targets.items():
+            # Skip locations that are this ant's own false locations
+            if location in self.own_false_locations:
+                continue
+
+            # Skip confirmed locations
             if location in self.confirmed_false_locations or location in self.confirmed_true_locations:
                 continue
 
