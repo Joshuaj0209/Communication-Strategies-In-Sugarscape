@@ -28,7 +28,7 @@ class SugarScape:
         self.false_broadcasters = random.sample(self.ants, 2)
         # Initialize broadcast times for each false broadcaster
         self.broadcast_times = {ant: pygame.time.get_ticks() + 10000 for ant in self.false_broadcasters}
-
+        self.false_broadcasters_locations = set()  # Track false locations
 
         # Tracking statistics for positive/negative broadcasts
         self.true_positives = 0
@@ -69,6 +69,10 @@ class SugarScape:
             if ant.is_alive():
                 ant.move(self.sugar_patches, self)
                 alive_ants.append(ant)
+
+                # Track false broadcast locations historically
+                if ant in self.false_broadcasters and ant.false_broadcast_location:
+                    self.false_broadcasters_locations.add(ant.false_broadcast_location)
             else:
                 self.dead_ants_count += 1
                 self.total_lifespan_of_dead_ants += ant.lifespan
@@ -125,14 +129,14 @@ class SugarScape:
             color = GREEN if ant in self.false_broadcasters else RED
             pygame.draw.circle(screen, color, (int(ant.x), int(ant.y)), ANT_SIZE)
         
-         # Collect all communicated locations from all ants
-        communicated_locations = set()
-        for ant in self.ants:
-            for location in ant.communicated_targets.keys():
-                communicated_locations.add(location)
+        # Collect all false broadcast locations from false broadcasters
+        false_locations = set()
+        for ant in self.false_broadcasters:
+            if ant.false_broadcast_location:
+                false_locations.add(ant.false_broadcast_location)
 
-        # Draw a red square at each communicated location
-        for location in communicated_locations:
+        # Draw a red square at each false location
+        for location in false_locations:
             x, y = location
             pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(int(x) - 3, int(y) - 3, 6, 6))
 
