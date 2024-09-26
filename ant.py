@@ -192,7 +192,7 @@ class Ant:
                     if key in self.already_communicated:
                         del self.already_communicated[key]
                 self.false_broadcast_location = None  # Reset for a new false location
-                self.sugarscape.broadcast_times[self] += 10000
+                self.sugarscape.broadcast_times[self] = current_time + 10000  # Schedule next broadcast in 10 seconds
             self.broadcast_sugar_location('confirmed', false_location=True)
 
         # Before moving, store the previous target

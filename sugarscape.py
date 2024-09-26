@@ -27,7 +27,7 @@ class SugarScape:
         # Choose two false broadcaster ants
         self.false_broadcasters = random.sample(self.ants, 2)
         # Initialize broadcast times for each false broadcaster
-        self.broadcast_times = {ant: pygame.time.get_ticks() + 1000 for ant in self.false_broadcasters}
+        self.broadcast_times = {ant: pygame.time.get_ticks() + 10000 for ant in self.false_broadcasters}
 
 
         # Tracking statistics for positive/negative broadcasts
@@ -125,12 +125,16 @@ class SugarScape:
             color = GREEN if ant in self.false_broadcasters else RED
             pygame.draw.circle(screen, color, (int(ant.x), int(ant.y)), ANT_SIZE)
         
-        # Draw communicated locations (for visualization)
-        for loc, count in self.communicated_locations.items():
-            base_intensity = 150  # Start with darker red 
-            color_intensity = max(0, base_intensity - count * 40)  # Decrease intensity by 20 per communication
-            color = (255, color_intensity, color_intensity)  # Darken red progressively
-            pygame.draw.rect(screen, color, (loc[0], loc[1], SQUARE_SIZE, SQUARE_SIZE))
+         # Collect all communicated locations from all ants
+        communicated_locations = set()
+        for ant in self.ants:
+            for location in ant.communicated_targets.keys():
+                communicated_locations.add(location)
+
+        # Draw a red square at each communicated location
+        for location in communicated_locations:
+            x, y = location
+            pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(int(x) - 3, int(y) - 3, 6, 6))
 
 
     def get_analytics_data(self):
