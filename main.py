@@ -22,6 +22,11 @@ def run_simulation(sim_number):
 
         sugarscape.update(sim_time)
 
+        # End the simulation early if there are no ants remaining
+        if len(sugarscape.ants) == 0:
+            print(f"Ending simulation {sim_number + 1} early at sim_time {sim_time} due to no ants remaining.")
+            running = False
+
         # You can comment out the rendering to speed up the simulation
         # game_surface = pygame.Surface((GAME_WIDTH, HEIGHT))
         # sugarscape.draw(game_surface)
@@ -42,7 +47,7 @@ def run_simulation(sim_number):
     return sugarscape.get_analytics_data()
 
 # Function to save analytics data to a CSV file
-def save_analytics_to_csv(analytics_list, filename='broadcast.csv'):
+def save_analytics_to_csv(analytics_list, filename='f2f.csv'):
     # Define CSV column headers based on the keys in the analytics dictionary
     headers = [
         'Total Sugar Patches', 'Consumed Sugar', 'Remaining Sugar', 
@@ -59,7 +64,7 @@ def save_analytics_to_csv(analytics_list, filename='broadcast.csv'):
 
 # Main function to run the simulation multiple times
 def main():
-    num_simulations = 4  # Number of times to run the simulation
+    num_simulations = 50  # Number of times to run the simulation
     all_analytics = []  # List to hold analytics data for all simulations
 
     # Run the simulation multiple times
