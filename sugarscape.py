@@ -5,7 +5,7 @@ from constants import *
 from ant import Ant
 
 class SugarScape:
-    def __init__(self):
+    def __init__(self, shared_agent):
         padding = 120  # Padding from the edges
         patch_size = int(math.sqrt(SUGAR_MAX)) * SQUARE_SIZE  # Size of the entire sugar patch
 
@@ -16,7 +16,7 @@ class SugarScape:
         ]
 
         # Initialize ants
-        self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT)) for _ in range(NUM_ANTS)]
+        self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), shared_agent) for _ in range(NUM_ANTS)]
         self.sugar_patches = self.initialize_sugar_patches()
         self.consumed_sugar_count = 0
         self.dead_ants_count = 0
