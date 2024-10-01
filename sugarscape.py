@@ -20,14 +20,14 @@ class SugarScape:
         self.sugar_patches = self.initialize_sugar_patches()
         self.consumed_sugar_count = 0
         self.dead_ants_count = 0
-        self.next_sugar_time = pygame.time.get_ticks() + NEW_SUGAR_INTERVAL
+        self.next_sugar_time = NEW_SUGAR_INTERVAL
         self.communicated_locations = {}  # Store locations with their communication counts
         self.total_lifespan_of_dead_ants = 0
 
         # Choose two false broadcaster ants
         self.false_broadcasters = random.sample(self.ants, 2)
         # Initialize broadcast times for each false broadcaster
-        self.broadcast_times = {ant: pygame.time.get_ticks() + 10000 for ant in self.false_broadcasters}
+        self.broadcast_times = {ant:600 for ant in self.false_broadcasters}
         self.false_broadcasters_locations = set()  # Track false locations
         self.historical_false_locations = set()  # Track all false locations historically
 
@@ -63,13 +63,13 @@ class SugarScape:
         
         return patches
 
-    def update(self):
-        current_time = pygame.time.get_ticks()
+    def update(self, sim_time):
+        current_time = sim_time
         alive_ants = []
 
         for ant in self.ants:
             if ant.is_alive():
-                ant.move(self.sugar_patches, self)
+                ant.move(self.sugar_patches, self, sim_time)
                 alive_ants.append(ant)
 
                 # Track false broadcast locations historically

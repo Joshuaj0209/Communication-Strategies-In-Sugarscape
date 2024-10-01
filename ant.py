@@ -20,12 +20,15 @@ class Ant:
         self.lifespan = 0
 
         # Set the mean and standard deviation for the target selection interval
-        self.mean_interval = 8000  # Mean interval of 8000ms
-        self.std_deviation = 2000  # Standard deviation of 2000ms
+        self.mean_interval = 480  # Mean interval of 480 frames (~8000 ms)
+        self.std_deviation = 120  # Standard deviation of 120 frames (~2000 ms)
 
         # Use a normal distribution for the first target selection interval
-        self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
-        self.next_target_selection_time = pygame.time.get_ticks() + self.target_selection_interval
+        self.target_selection_interval = max(
+                    30,  # Minimum interval of 30 frames (~500 ms)
+                    int(random.gauss(self.mean_interval, self.std_deviation))
+                ) 
+        self.next_target_selection_time = self.target_selection_interval
 
         self.confirmed_false_locations = []  # List to store confirmed false locations
         self.confirmed_true_locations = []  # List to store confirmed true locations
@@ -38,6 +41,12 @@ class Ant:
 
         # Track false locations created by this ant if it is a false broadcaster
         self.own_false_locations = set()
+
+        # # For false broadcasters, initialize next broadcast time
+        # if self in self.sugarscape.false_broadcasters:
+        #     self.next_broadcast_time = 0  # Will be set on first broadcast
+        # else:
+        #     self.next_broadcast_time = None  # Not used for regular ants
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -179,8 +188,8 @@ class Ant:
                         
 
     
-    def move(self, sugar_patches, sugarscape):
-        current_time = pygame.time.get_ticks()
+    def move(self, sugar_patches, sugarscape, sim_time):
+        current_time = sim_time
 
         sugar_detected = self.detect_sugar(sugar_patches)
 
@@ -228,7 +237,7 @@ class Ant:
                     random.randint(padding, GAME_WIDTH - padding),
                     random.randint(padding, HEIGHT - padding),
                 )
-                self.sugarscape.broadcast_times[self] = current_time + 10000  # Schedule next change in 10 seconds
+                self.sugarscape.broadcast_times[self] = current_time + 600  # Schedule next change in 6 seconds
             else:
                 if current_time >= self.sugarscape.broadcast_times[self]:
                     # Reset communication for the old false location

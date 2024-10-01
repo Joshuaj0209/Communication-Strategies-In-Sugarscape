@@ -6,6 +6,8 @@ from sugarscape import SugarScape
 
 def main():
     pygame.init()
+    sim_time = 0  # Initialize simulation time
+
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("SugarScape Simulation with Analytics")
     clock = pygame.time.Clock()
@@ -20,7 +22,9 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        sugarscape.update()
+        sim_time += 1  # Increment by 1 per frame (you can adjust this value)
+
+        sugarscape.update(sim_time)
 
         game_surface = pygame.Surface((GAME_WIDTH, HEIGHT))
         sugarscape.draw(game_surface)
@@ -40,7 +44,7 @@ def main():
         screen.blit(analytics_surface, (GAME_WIDTH, 0))
 
         pygame.display.flip()
-        clock.tick(60)
+        # clock.tick(1000)
 
     pygame.quit()
 
