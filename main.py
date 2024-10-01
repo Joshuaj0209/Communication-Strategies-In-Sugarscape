@@ -46,7 +46,7 @@ def save_analytics_to_csv(analytics_list, filename='broadcast.csv'):
     # Define CSV column headers based on the keys in the analytics dictionary
     headers = [
         'Total Sugar Patches', 'Consumed Sugar', 'Remaining Sugar', 
-        'Number of Ants', 'Dead Ants', 'Average Lifespan', 
+        'Number of Ants', 'Dead Ants', 'Median Lifespan', 
         'True Positives', 'False Positives', 'Exploits', 'Explores'
     ]
 

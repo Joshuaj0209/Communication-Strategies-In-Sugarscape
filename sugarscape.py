@@ -3,6 +3,7 @@ import pygame
 import math
 from constants import *
 from ant import Ant
+import statistics
 
 class SugarScape:
     def __init__(self):
@@ -45,6 +46,9 @@ class SugarScape:
         for ant in self.ants:
             ant.sugarscape = self
 
+        self.lifespans_of_dead_ants = []  # List to store the lifespan of ants that die
+
+
     def initialize_sugar_patches(self):
         patches = []
         grid_size = int(math.sqrt(SUGAR_MAX))
@@ -78,7 +82,7 @@ class SugarScape:
                     self.historical_false_locations.add(ant.false_broadcast_location)  # Track all false locations
             else:
                 self.dead_ants_count += 1
-                self.total_lifespan_of_dead_ants += ant.lifespan
+                self.lifespans_of_dead_ants.append(ant.lifespan)
 
         self.ants = alive_ants
 
@@ -150,14 +154,15 @@ class SugarScape:
 
 
     def get_analytics_data(self):
-        total_lifespan = self.total_lifespan_of_dead_ants  # Start with total lifespan of dead ants
-        
-        # Add the lifespan (age) of living ants
-        for ant in self.ants:
-            total_lifespan += ant.lifespan  # Add each living ant's current age
 
-        total_ants = self.dead_ants_count + len(self.ants)  # Total number of ants, dead + alive
-        average_lifespan = total_lifespan / total_ants if total_ants > 0 else 0  # Calculate average
+        all_lifespans = self.lifespans_of_dead_ants + [ant.lifespan for ant in self.ants]
+
+        # Calculate the median lifespan of all ants (dead + alive)
+        if all_lifespans:
+            median_lifespan = statistics.median(all_lifespans)
+        else:
+            median_lifespan = 0  # If no ants have lifespans, set the median lifespan to 0
+
 
         return {
             'Total Sugar Patches': len(self.sugar_patches),
@@ -165,7 +170,7 @@ class SugarScape:
             'Remaining Sugar': len([s for s in self.sugar_patches if s[2]]),
             'Number of Ants': len(self.ants),
             'Dead Ants': self.dead_ants_count,
-            'Average Lifespan': average_lifespan,
+            'Median Lifespan': median_lifespan,
             'True Positives': self.true_positives,
             'False Positives': self.false_positives,
             'Exploits': self.exploit_count,
