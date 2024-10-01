@@ -2,6 +2,7 @@ import random
 import math
 import pygame
 from constants import *
+import collections  # Import collections module for OrderedDict
 
 class Ant:
     def __init__(self, x, y):
@@ -13,7 +14,10 @@ class Ant:
         self.initial_health = INITIAL_HEALTH
         self.max_health = MAX_HEALTH
         self.target = None
-        self.communicated_targets = {}  # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count}
+         # Use OrderedDict for communicated_targets to maintain order
+        self.communicated_targets = collections.OrderedDict()
+        # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count}
+
         self.already_communicated = {}  # Key: other_ant, Value: {location: characteristic}
         self.current_broadcast_characteristic = None  # Track current broadcast characteristic
 
@@ -169,11 +173,22 @@ class Ant:
                                     if other_ant.communicated_targets[location][previous_characteristic] <= 0:
                                         del other_ant.communicated_targets[location][previous_characteristic]
                                     if not other_ant.communicated_targets[location]:
+                                        # Remove the location from communicated_targets
                                         del other_ant.communicated_targets[location]
                         # Increment count for new characteristic
-                        if location not in other_ant.communicated_targets:
-                            other_ant.communicated_targets[location] = {}
-                        other_ant.communicated_targets[location][characteristic] = other_ant.communicated_targets[location].get(characteristic, 0) + 1
+                        if location in other_ant.communicated_targets:
+                            # Update counts
+                            counts = other_ant.communicated_targets[location]
+                            counts[characteristic] = counts.get(characteristic, 0) + 1
+                            # Move the location to the end to reflect recent communication
+                            other_ant.communicated_targets.move_to_end(location)
+                        else:
+                            # Add new location
+                            other_ant.communicated_targets[location] = {characteristic: 1}
+                            # Ensure communicated_targets remains within size limit
+                            if len(other_ant.communicated_targets) > 10:
+                                # Remove the oldest item
+                                other_ant.communicated_targets.popitem(last=False)
                         # Update 'already_communicated'
                         self.already_communicated[other_ant][location] = characteristic
                         
