@@ -90,15 +90,19 @@ class SugarScape:
 
     def add_new_sugar_patch(self):
         max_attempts = 100  
-        min_distance = 100  
+        min_distance = 150  
 
         grid_size = int(math.sqrt(SUGAR_MAX)) 
         half_grid = grid_size // 2
 
+        patch_size = int(math.sqrt(SUGAR_MAX)) * SQUARE_SIZE  # Calculate patch size based on SUGAR_MAX
+        padding = 20 
+
         for attempt in range(max_attempts):
-            x = random.randint(0, GAME_WIDTH)
-            y = random.randint(0, HEIGHT)
-            
+            # Ensure x and y are within the allowed area, considering the patch size and padding
+            x = random.randint(padding + patch_size // 2, GAME_WIDTH - padding - patch_size // 2)
+            y = random.randint(padding + patch_size // 2, HEIGHT - padding - patch_size // 2)
+
             too_close = any(math.sqrt((x - sugar[0]) ** 2 + (y - sugar[1]) ** 2) < min_distance for sugar in self.sugar_patches)
             
             if not too_close:
@@ -112,6 +116,7 @@ class SugarScape:
                     # Store the sugar location along with the center of the patch
                     self.sugar_patches.append([square_x, square_y, True, (center_x, center_y)])
                 break
+
 
     def draw(self, screen):
         screen.fill(WHITE)

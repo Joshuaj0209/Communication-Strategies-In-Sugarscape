@@ -67,6 +67,14 @@ class Ant:
         viable_targets = []
         total_weight = 0
 
+        exploration_probability = self.health / self.max_health
+
+        # If health is above a certain threshold, explore rather than exploit
+        if random.random() < exploration_probability:
+            self.explore()
+            sugarscape.explore_count += 1
+            return
+
         for location, counts in self.communicated_targets.items():
             # Skip locations that are this ant's own false locations
             if location in self.own_false_locations:
