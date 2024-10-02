@@ -15,7 +15,7 @@ def run_simulation(sim_number):
     running = True
 
     # Run the simulation until a condition or maximum sim_time is reached
-    max_sim_time = 15000  # Example: Limit each simulation to 10,000 steps (you can adjust this)
+    max_sim_time = 25000  # Example: Limit each simulation to 10,000 steps (you can adjust this)
     
     while running and sim_time < max_sim_time:
         sim_time += 1  # Increment simulation time per frame
@@ -23,8 +23,8 @@ def run_simulation(sim_number):
         sugarscape.update(sim_time)
 
         # End the simulation early if there are no ants remaining
-        if len(sugarscape.ants) == 0:
-            print(f"Ending simulation {sim_number + 1} early at sim_time {sim_time} due to no ants remaining.")
+        if len(sugarscape.ants) <=3:
+            print(f"Ending simulation {sim_number + 1} early at sim_time {sim_time} due to only 3 ants remaining.")
             running = False
 
         # You can comment out the rendering to speed up the simulation
@@ -51,7 +51,7 @@ def save_analytics_to_csv(analytics_list, filename='f2f.csv'):
     # Define CSV column headers based on the keys in the analytics dictionary
     headers = [
         'Total Sugar Patches', 'Consumed Sugar', 'Remaining Sugar', 
-        'Number of Ants', 'Dead Ants', 'Median Lifespan', 
+        'Number of Ants', 'Dead Ants', 'Average Lifespan', 
         'True Positives', 'False Positives', 'Exploits', 'Explores'
     ]
 
@@ -64,7 +64,7 @@ def save_analytics_to_csv(analytics_list, filename='f2f.csv'):
 
 # Main function to run the simulation multiple times
 def main():
-    num_simulations = 50  # Number of times to run the simulation
+    num_simulations = 100  # Number of times to run the simulation
     all_analytics = []  # List to hold analytics data for all simulations
 
     # Run the simulation multiple times

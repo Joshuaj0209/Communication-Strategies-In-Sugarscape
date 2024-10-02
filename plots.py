@@ -22,7 +22,7 @@ print("\nAverage values for Face-to-Face Communication:")
 print(face_averages)
 
 # Metrics to plot (updated to include 'Median Lifespan' instead of 'Average Lifespan')
-metrics_to_plot = ["Median Lifespan", "Exploits", "Explores", "True Positives", "False Positives"]
+metrics_to_plot = ["Average Lifespan", "Exploits", "Explores", "True Positives", "False Positives"]
 
 # Plot each metric in a bar chart to compare the two approaches
 for metric in metrics_to_plot:
@@ -46,7 +46,7 @@ plt.show()
 
 # Boxplot for the distribution of 'Median Lifespan'
 plt.figure(figsize=(8, 6))
-plt.boxplot([broad_df['Median Lifespan'], face_df['Median Lifespan']], labels=['Broad Communication', 'Face-to-Face Communication'])
+plt.boxplot([broad_df['Average Lifespan'], face_df['Average Lifespan']], labels=['Broad Communication', 'Face-to-Face Communication'])
 plt.title("Distribution of Median Lifespan")
 plt.ylabel("Median Lifespan")
 plt.show()
