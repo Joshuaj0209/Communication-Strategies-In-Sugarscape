@@ -25,12 +25,15 @@ class Ant:
         self.lifespan = 0
 
         # Set the mean and standard deviation for the target selection interval
-        self.mean_interval = 8000  # Mean interval of 8000ms
-        self.std_deviation = 2000  # Standard deviation of 2000ms
+        self.mean_interval = 480  # Mean interval of 480 frames (~8000 ms)
+        self.std_deviation = 120  # Standard deviation of 120 frames (~2000 ms)
 
         # Use a normal distribution for the first target selection interval
-        self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
-        self.next_target_selection_time = pygame.time.get_ticks() + self.target_selection_interval
+        self.target_selection_interval = max(
+                    30,  # Minimum interval of 30 frames (~500 ms)
+                    int(random.gauss(self.mean_interval, self.std_deviation))
+                ) 
+        self.next_target_selection_time = self.target_selection_interval
 
         self.confirmed_false_locations = set()  # List to store confirmed false locations
         self.confirmed_true_locations = set()  # List to store confirmed true locations
@@ -51,6 +54,9 @@ class Ant:
         self.agent = agent
 
         self.has_reached_target = False  # Add this line
+
+        self.previous_health = self.health  # For tracking health changes
+
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -172,8 +178,8 @@ class Ant:
                         
 
     
-    def move(self, sugar_patches, sugarscape):
-        current_time = pygame.time.get_ticks()
+    def move(self, sugar_patches, sugarscape, sim_time):
+        current_time = sim_time
 
         sugar_detected = self.detect_sugar(sugar_patches)
 
@@ -221,7 +227,7 @@ class Ant:
                     random.randint(padding, GAME_WIDTH - padding),
                     random.randint(padding, HEIGHT - padding),
                 )
-                self.sugarscape.broadcast_times[self] = current_time + 10000  # Schedule next change in 10 seconds
+                self.sugarscape.broadcast_times[self] = current_time +  600  # Schedule next change in 6 seconds
             else:
                 if current_time >= self.sugarscape.broadcast_times[self]:
                     # Reset communication for the old false location
@@ -436,25 +442,19 @@ class Ant:
 
     
     def calculate_reward(self):
-        reward = 0
-        if getattr(self, 'just_ate_sugar', False):
-            reward += 10  # Positive reward for eating sugar
-            self.just_ate_sugar = False  # Reset the flag
-        if getattr(self, 'just_visited_false_location', False):
-            reward -= 5  # Negative reward for visiting a false location
-            self.just_visited_false_location = False  # Reset the flag
-        if getattr(self, 'just_reached_true_target', False):
-            reward += 5  # Additional positive reward for reaching a true communicated target
-            self.sugarscape.true_positives += 1
-            self.sugarscape.exploit_count += 1
+        # Reward for survival
+        reward = 1  # Positive reward per time step for being alive
 
-            self.just_reached_true_target = False  # Reset the flag
-        if getattr(self, 'just_reached_false_target', False):
-            reward -= 5  # Additional negative reward for reaching a false communicated target
-            self.sugarscape.false_positives += 1
-            self.sugarscape.exploit_count += 1
-            self.just_reached_false_target = False  # Reset the flag
-        # Time penalty to encourage efficiency
-        reward -= 0.1
+        # Reward or penalty based on health change
+        health_change = self.health - self.previous_health
+        reward += health_change  # Positive if health increased, negative if decreased
+
+        # Update previous health for the next time step
+        self.previous_health = self.health
+
+        # Optional: Remove or adjust the time penalty
+        # reward -= 0.1  # If you want to encourage efficiency
+
         return reward
+
 

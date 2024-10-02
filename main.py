@@ -25,17 +25,19 @@ def main(render=False):
 
         # Initialize the environment for each episode
         sugarscape = SugarScape(shared_agent)
+        sim_time = 0  # Initialize simulation time
 
         running = True
-        time_step = 0
-        while running and time_step < episode_length:
+        while running and sim_time < episode_length:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                     pygame.quit()
                     sys.exit()
+            
+            sim_time += 1
 
-            sugarscape.update()
+            sugarscape.update(sim_time)
             if render:
                 game_surface = pygame.Surface((GAME_WIDTH, HEIGHT))
                 sugarscape.draw(game_surface)
@@ -62,7 +64,6 @@ def main(render=False):
                 print("Fewer than 3 ants remaining. Ending episode early.")
                 break
 
-            time_step += 1
 
         # End of episode processing (optional)
         # You can collect metrics, adjust parameters, etc.
@@ -70,7 +71,7 @@ def main(render=False):
         analytics_data = sugarscape.get_analytics_data()
         average_lifespan = analytics_data.get('Average Lifespan', 0)
         true_positives = analytics_data.get('True Positives', 0)
-        print(f"Episode Time: {time_step}")
+        print(f"Episode Time: {sim_time}")
         print(f"Average Lifespan: {average_lifespan:.2f}")
         print(f"True Positives: {true_positives}")
 
