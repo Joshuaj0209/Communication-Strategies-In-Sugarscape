@@ -71,16 +71,21 @@ class AntRLAgent:
         if self.is_eval:
             return  # Do not store experiences during evaluation
         self.memory.append((state, action, reward, next_state, done))
+        # print(f"Experience stored! Memory size: {len(self.memory)}")
+
 
     def update_policy(self):
         if self.is_eval:
             return  # Do not update policy during evaluation
 
         if len(self.memory) < self.batch_size:
+            # print(f"Not enough experiences to train. Current memory size: {len(self.memory)}")
             return  # Not enough experiences to train
 
         # Sample a batch of experiences
         batch = random.sample(self.memory, self.batch_size)
+        # print(f"Training with a batch of {self.batch_size} experiences. Current memory size: {len(self.memory)}")
+
         states, actions, rewards, next_states, dones = zip(*batch)
 
         # Convert to tensors and move to device

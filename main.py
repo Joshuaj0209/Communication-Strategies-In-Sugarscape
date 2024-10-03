@@ -3,6 +3,7 @@ import sys
 import time  # Add this import for timing
 from constants import *
 from sugarscape import SugarScape
+import matplotlib.pyplot as plt  # Import for plotting
 from rl_agent import AntRLAgent  # Add this import
 
 def main(render=False):
@@ -18,8 +19,11 @@ def main(render=False):
     action_size = 6  # N=5 communicated targets + 1 explore action
     shared_agent = AntRLAgent(state_size, action_size)
 
-    num_episodes = 100  # Define the number of training episodes
-    episode_length = 8000  # Define the length of each episode in time steps
+    num_episodes = 200  # Define the number of training episodes
+    episode_length = 20000  # Define the length of each episode in time steps
+
+    episode_rewards = []
+
 
     for episode in range(num_episodes):
         print(f"Starting Episode {episode + 1}/{num_episodes}")
@@ -86,7 +90,10 @@ def main(render=False):
         else:
             average_reward = 0
 
-        print(f"Episode {episode + 1}; Duration: {episode_duration:.2f}; seconds Average Reward: {average_reward:.2f}")
+        print(f"Episode {episode + 1}; Duration: {episode_duration:.2f} seconds; Average Reward: {average_reward:.2f}")
+
+        # Store the average reward for this episode
+        episode_rewards.append(average_reward)
 
         # End of episode processing (optional)
         # You can collect metrics, adjust parameters, etc.
@@ -99,6 +106,13 @@ def main(render=False):
 
     # After training, save the trained agent
     shared_agent.save_model("trained_agent.pth")
+
+    # Plot the rewards
+    plt.plot(range(1, num_episodes + 1), episode_rewards)
+    plt.xlabel('Episode')
+    plt.ylabel('Average Reward')
+    plt.title('Average Reward per Episode')
+    plt.show()
 
     if render:
         pygame.quit()
