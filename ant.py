@@ -266,7 +266,7 @@ class Ant:
         previous_target = self.target
 
         # Movement logic that might change self.target
-        if not sugar_detected and not self.target and not self.arrived_at_target and self.needs_to_eat():
+        if not sugar_detected and not self.target and self.needs_to_eat():
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
@@ -331,7 +331,10 @@ class Ant:
 
             else:
                 self.direction = math.atan2(dy, dx)
-        elif self.arrived_at_target:     # used for rewarding after reaching a target
+        else:
+            self.direction += random.uniform(-self.turn_angle, self.turn_angle)
+
+        if self.arrived_at_target:     # used for rewarding after reaching a target
             # Increment frames since arrival
             self.frames_since_arrival += 1
 
@@ -360,8 +363,7 @@ class Ant:
                     # If still alive, update the previous state
                     if not done:
                         self.prev_state = self.get_state()
-        else:
-            self.direction += random.uniform(-self.turn_angle, self.turn_angle)
+        
 
         self.x += ANT_SPEED * math.cos(self.direction)
         self.y += ANT_SPEED * math.sin(self.direction)
