@@ -1,27 +1,31 @@
 import pygame
 import sys
+import time  # Add this import for timing
 from constants import *
 from sugarscape import SugarScape
 from rl_agent import AntRLAgent  # Add this import
 
 def main(render=False):
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("SugarScape Simulation with Analytics")
-    clock = pygame.time.Clock()
+    if render:
+        pygame.init()
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("SugarScape Simulation with Analytics")
+        clock = pygame.time.Clock()
+        font = pygame.font.Font(None, 24)
 
     # Initialize the RL agent once
     state_size = 24  # Based on your state representation
     action_size = 6  # N=5 communicated targets + 1 explore action
     shared_agent = AntRLAgent(state_size, action_size)
 
-    font = pygame.font.Font(None, 24)
-
-    num_episodes = 1000  # Define the number of training episodes
-    episode_length = 20000  # Define the length of each episode in time steps
+    num_episodes = 100  # Define the number of training episodes
+    episode_length = 8000  # Define the length of each episode in time steps
 
     for episode in range(num_episodes):
         print(f"Starting Episode {episode + 1}/{num_episodes}")
+
+        # Start timing the episode
+        episode_start_time = time.time()  # Start time of the episode
 
         # Initialize the environment for each episode
         sugarscape = SugarScape(shared_agent)
@@ -29,12 +33,13 @@ def main(render=False):
 
         running = True
         while running and sim_time < episode_length:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                    pygame.quit()
-                    sys.exit()
-            
+            if render:  # Only check Pygame events when rendering is enabled
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                        pygame.quit()
+                        sys.exit()
+
             sim_time += 1
 
             sugarscape.update(sim_time)
@@ -64,10 +69,13 @@ def main(render=False):
                 print("Fewer than 3 ants remaining. Ending episode early.")
                 break
 
+        # End of episode timing
+        episode_end_time = time.time()  # End time of the episode
+        episode_duration = episode_end_time - episode_start_time  # Calculate duration
+        print(f"Episode {episode + 1} Duration: {episode_duration:.2f} seconds")
 
         # End of episode processing (optional)
         # You can collect metrics, adjust parameters, etc.
-
         analytics_data = sugarscape.get_analytics_data()
         average_lifespan = analytics_data.get('Average Lifespan', 0)
         true_positives = analytics_data.get('True Positives', 0)
@@ -75,13 +83,12 @@ def main(render=False):
         print(f"Average Lifespan: {average_lifespan:.2f}")
         print(f"True Positives: {true_positives}")
 
-
     # After training, save the trained agent
     shared_agent.save_model("trained_agent.pth")
 
-    pygame.quit()
+    if render:
+        pygame.quit()
 
 
 if __name__ == "__main__":
     main(render=False)  # Run training
-    # evaluate_agent()  # Run evaluation after training

@@ -57,6 +57,9 @@ class Ant:
 
         self.previous_health = self.health  # For tracking health changes
 
+        self.cumulative_reward = 0
+        self.action_in_progress = False
+
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -93,13 +96,23 @@ class Ant:
         # Store the state and action for later use
         self.prev_state = state
         self.prev_action = action
+
+        # Reset cumulative reward and action tracking
+        self.cumulative_reward = 0
+        self.action_in_progress = True
         
         # Determine the action
         N = 5  # Number of communicated targets to consider
-        if action < N and action < len(self.communicated_targets):
+
+        # Shuffle the communicated targets to randomize their order
+        target_items = list(self.communicated_targets.items())
+        random.shuffle(target_items)
+        target_items = target_items[:N]  # Take up to N targets
+
+        if action < len(target_items):
             # Select the target corresponding to the action
-            target_list = list(self.communicated_targets.keys())[:N]
-            self.target = target_list[action]
+            location, counts = target_items[action]
+            self.target = location
             self.is_exploring_target = False
             self.broadcast_sugar_location('accepted')
         else:
@@ -336,26 +349,30 @@ class Ant:
                     del self.already_communicated[other_ant]
             # Do not reset current_broadcast_characteristic here, since we continue broadcasting after reaching the target
         
-        # Calculate reward
+        # Calculate and accumulate the reward
         reward = self.calculate_reward()
+        if self.action_in_progress:
+            self.cumulative_reward += reward
 
-        # Get next state
-        next_state = self.get_state()
-
-        # Check if the episode is done
+        # If the target has changed or the ant dies, store the experience and update policy
         done = not self.is_alive()
 
-        # Store experience and update policy
-        if hasattr(self, 'prev_state') and hasattr(self, 'prev_action'):
-            self.agent.store_experience(self.prev_state, self.prev_action, reward, next_state, done)
-            self.agent.update_policy()
+        if self.target != previous_target or done:
+            if self.action_in_progress:
+                # Get next state
+                next_state = self.get_state()
 
-        # Update previous state and action
-        if not done:
-            self.prev_state = next_state
-            # The action will be set during the next select_new_target call
+                # Store experience and update policy
+                self.agent.store_experience(self.prev_state, self.prev_action, self.cumulative_reward, next_state, done)
+                self.agent.update_policy()
 
+                # Reset for next action
+                self.action_in_progress = False
+                self.cumulative_reward = 0
 
+            # If still alive, update the previous state
+            if not done:
+                self.prev_state = self.get_state()
 
 
     def needs_to_eat(self):
