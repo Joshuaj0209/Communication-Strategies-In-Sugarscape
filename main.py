@@ -31,6 +31,9 @@ def main(render=False):
         sugarscape = SugarScape(shared_agent)
         sim_time = 0  # Initialize simulation time
 
+        # Track the total reward for all ants
+        total_rewards = []
+
         running = True
         while running and sim_time < episode_length:
             if render:  # Only check Pygame events when rendering is enabled
@@ -69,10 +72,21 @@ def main(render=False):
                 print("Fewer than 3 ants remaining. Ending episode early.")
                 break
 
+        # Collect rewards for all ants after the episode ends
+        for ant in sugarscape.ants:
+            total_rewards.append(ant.total_episode_reward)
+
         # End of episode timing
         episode_end_time = time.time()  # End time of the episode
         episode_duration = episode_end_time - episode_start_time  # Calculate duration
-        print(f"Episode {episode + 1} Duration: {episode_duration:.2f} seconds")
+
+        # Compute the average reward for the episode
+        if total_rewards:
+            average_reward = sum(total_rewards) / len(total_rewards)
+        else:
+            average_reward = 0
+
+        print(f"Episode {episode + 1}; Duration: {episode_duration:.2f}; seconds Average Reward: {average_reward:.2f}")
 
         # End of episode processing (optional)
         # You can collect metrics, adjust parameters, etc.

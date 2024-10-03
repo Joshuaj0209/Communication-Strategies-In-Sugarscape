@@ -64,7 +64,7 @@ class Ant:
         self.frames_since_arrival = 0   # Counter for frames since arrival
         self.max_arrival_frames = 40    # Number of frames to wait after arrival
 
-
+        self.total_episode_reward = 0  # Track total reward for the episode
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -394,6 +394,9 @@ class Ant:
         if self.action_in_progress:
             self.cumulative_reward += reward
 
+        # Also accumulate to total_episode_reward
+        self.total_episode_reward += reward
+        
         # Check if the ant is dead
         done = not self.is_alive()
         if done:
