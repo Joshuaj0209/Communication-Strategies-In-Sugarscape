@@ -60,6 +60,11 @@ class Ant:
         self.cumulative_reward = 0
         self.action_in_progress = False
 
+        self.arrived_at_target = False  # Flag to indicate arrival at target (necessary for the delayed reward)
+        self.frames_since_arrival = 0   # Counter for frames since arrival
+        self.max_arrival_frames = 40    # Number of frames to wait after arrival
+
+
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -261,7 +266,7 @@ class Ant:
         previous_target = self.target
 
         # Movement logic that might change self.target
-        if not sugar_detected and not self.target and self.needs_to_eat():
+        if not sugar_detected and not self.target and not self.arrived_at_target and self.needs_to_eat():
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
@@ -320,8 +325,41 @@ class Ant:
                 self.target = None  # Clear the target after reaching it
                 self.is_exploring_target = None  # Reset the flag
 
+                # Set arrived_at_target flag and reset frame counter
+                self.arrived_at_target = True
+                self.frames_since_arrival = 0
+
             else:
                 self.direction = math.atan2(dy, dx)
+        elif self.arrived_at_target:     # used for rewarding after reaching a target
+            # Increment frames since arrival
+            self.frames_since_arrival += 1
+
+            # Continue accumulating rewards
+            if self.frames_since_arrival < self.max_arrival_frames:
+                pass  # Keep accumulating rewards for 15 frames after arrival
+
+            # Check if waiting period is over (i.e., 15 frames have passed)
+            if self.frames_since_arrival >= self.max_arrival_frames:
+                self.arrived_at_target = False  # Reset flag
+
+                # End the action after the reward accumulation window is over
+                if self.action_in_progress:
+                    # Get next state
+                    next_state = self.get_state()
+                    done = not self.is_alive()
+
+                    # Store experience and update policy
+                    self.agent.store_experience(self.prev_state, self.prev_action, self.cumulative_reward, next_state, done)
+                    self.agent.update_policy()
+
+                    # Reset for next action
+                    self.action_in_progress = False
+                    self.cumulative_reward = 0
+
+                    # If still alive, update the previous state
+                    if not done:
+                        self.prev_state = self.get_state()
         else:
             self.direction += random.uniform(-self.turn_angle, self.turn_angle)
 
@@ -354,10 +392,9 @@ class Ant:
         if self.action_in_progress:
             self.cumulative_reward += reward
 
-        # If the target has changed or the ant dies, store the experience and update policy
+        # Check if the ant is dead
         done = not self.is_alive()
-
-        if self.target != previous_target or done:
+        if done:
             if self.action_in_progress:
                 # Get next state
                 next_state = self.get_state()
@@ -369,10 +406,6 @@ class Ant:
                 # Reset for next action
                 self.action_in_progress = False
                 self.cumulative_reward = 0
-
-            # If still alive, update the previous state
-            if not done:
-                self.prev_state = self.get_state()
 
 
     def needs_to_eat(self):
