@@ -90,7 +90,7 @@ class SugarScape:
 
     def add_new_sugar_patch(self):
         max_attempts = 100  
-        min_distance = 150  
+        min_distance = 100  
 
         grid_size = int(math.sqrt(SUGAR_MAX)) 
         half_grid = grid_size // 2
