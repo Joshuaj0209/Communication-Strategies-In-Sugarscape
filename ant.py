@@ -6,7 +6,9 @@ import collections  # Import collections module for OrderedDict
 import numpy as np 
 
 class Ant:
-    def __init__(self, x, y, agent):
+    def __init__(self, x, y, agent, ant_id):
+        self.id = ant_id  # Unique identifier for the ant
+
         self.x = x
         self.y = y
         self.direction = random.uniform(0, 2 * math.pi)
@@ -25,12 +27,12 @@ class Ant:
         self.lifespan = 0
 
         # Set the mean and standard deviation for the target selection interval
-        self.mean_interval = 480  # Mean interval of 480 frames (~8000 ms)
+        self.mean_interval = 700  # Mean interval of 480 frames (~8000 ms)
         self.std_deviation = 120  # Standard deviation of 120 frames (~2000 ms)
 
         # Use a normal distribution for the first target selection interval
         self.target_selection_interval = max(
-                    30,  # Minimum interval of 30 frames (~500 ms)
+                    300,  # Minimum interval of 30 frames (~500 ms)
                     int(random.gauss(self.mean_interval, self.std_deviation))
                 ) 
         self.next_target_selection_time = self.target_selection_interval
@@ -105,9 +107,10 @@ class Ant:
         # Reset cumulative reward and action tracking
         self.cumulative_reward = 0
         self.action_in_progress = True
+        # print("Action has begun for ant ", self.id)
         
         # Determine the action
-        N = 5  # Number of communicated targets to consider
+        N = 10  # Number of communicated targets to consider
 
         # Shuffle the communicated targets to randomize their order
         target_items = list(self.communicated_targets.items())
@@ -123,11 +126,14 @@ class Ant:
         else:
             # Explore
             self.explore()
+
             sugarscape.explore_count += 1
 
     def explore(self):
         # Exploration logic: move randomly within the environment
-        self.target = (random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT))
+        # self.target = (random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT))
+        self.target = None  # Ensure no target is set
+
         self.is_exploring_target = True  # Mark this target as an exploration target
 
 
@@ -199,6 +205,9 @@ class Ant:
     def move(self, sugar_patches, sugarscape, sim_time):
         current_time = sim_time
 
+        # Store the previous target before detecting sugar
+        previous_target = self.target
+
         sugar_detected = self.detect_sugar(sugar_patches)
 
         # Store the previous broadcast characteristic and location
@@ -240,12 +249,12 @@ class Ant:
         if self in self.sugarscape.false_broadcasters:
             if self.false_broadcast_location is None:
                 # Generate a new false location
-                padding = 100
+                padding = 30
                 self.false_broadcast_location = (
                     random.randint(padding, GAME_WIDTH - padding),
                     random.randint(padding, HEIGHT - padding),
                 )
-                self.sugarscape.broadcast_times[self] = current_time +  600  # Schedule next change in 6 seconds
+                self.sugarscape.broadcast_times[self] = current_time +  800  # Schedule next change in 6 seconds
             else:
                 if current_time >= self.sugarscape.broadcast_times[self]:
                     # Reset communication for the old false location
@@ -261,10 +270,6 @@ class Ant:
             if self.false_broadcast_location:
                 self.broadcast_sugar_location('confirmed', false_location=True)
 
-
-        # Before moving, store the previous target
-        previous_target = self.target
-
         # Movement logic that might change self.target
         if not sugar_detected and not self.target and self.needs_to_eat():
             if current_time >= self.next_target_selection_time:
@@ -274,8 +279,19 @@ class Ant:
                     # No viable targets; explore
                     self.explore()
                     sugarscape.explore_count += 1
-                self.target_selection_interval = max(500, random.gauss(self.mean_interval, self.std_deviation))
-                self.next_target_selection_time += self.target_selection_interval
+                self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
+                self.next_target_selection_time = current_time + self.target_selection_interval
+        
+         # After all possible changes to self.target, check if it has changed
+        if self.action_in_progress and self.target != previous_target:
+            # The action has been interrupted
+            self.agent.store_reward(self.cumulative_reward)
+            self.action_in_progress = False
+            self.cumulative_reward = 0
+
+            # print(f"Target changed. Previous target: {previous_target}, Current target: {self.target}")
+            self.next_target_selection_time = current_time + self.target_selection_interval
+
 
         if self.target:
             dx = self.target[0] - self.x
@@ -333,6 +349,8 @@ class Ant:
                 self.direction = math.atan2(dy, dx)
         else:
             self.direction += random.uniform(-self.turn_angle, self.turn_angle)
+            self.direction %= 2 * math.pi  # Ensure direction stays within 0 to 2π
+
 
         if self.arrived_at_target:     # used for rewarding after reaching a target
             # Increment frames since arrival
@@ -349,20 +367,19 @@ class Ant:
                 # End the action after the reward accumulation window is over
                 if self.action_in_progress:
                     # Get next state
-                    next_state = self.get_state()
                     done = not self.is_alive()
 
-                    # Store experience and update policy
-                    self.agent.store_experience(self.prev_state, self.prev_action, self.cumulative_reward, next_state, done)
-                    self.agent.update_policy()
-
-                    # Reset for next action
+                    self.agent.store_reward(self.cumulative_reward)
+                    # No longer calling self.agent.update_policy() here
                     self.action_in_progress = False
                     self.cumulative_reward = 0
 
                     # If still alive, update the previous state
                     if not done:
                         self.prev_state = self.get_state()
+
+                    self.next_target_selection_time = current_time + self.target_selection_interval
+
         
 
         self.x += ANT_SPEED * math.cos(self.direction)
@@ -401,16 +418,13 @@ class Ant:
         done = not self.is_alive()
         if done:
             if self.action_in_progress:
-                # Get next state
-                next_state = self.get_state()
-
-                # Store experience and update policy
-                self.agent.store_experience(self.prev_state, self.prev_action, self.cumulative_reward, next_state, done)
-                self.agent.update_policy()
-
-                # Reset for next action
+                self.agent.store_reward(self.cumulative_reward)
+                # No longer calling self.agent.update_policy() here
                 self.action_in_progress = False
                 self.cumulative_reward = 0
+
+                self.next_target_selection_time = current_time + self.target_selection_interval
+
 
 
     def needs_to_eat(self):
@@ -456,7 +470,7 @@ class Ant:
         state_features.extend([x_normalized, y_normalized])
         
         # Communicated targets
-        N = 5  # Number of communicated targets to include
+        N = 10  # Number of communicated targets to include
         max_distance = math.hypot(GAME_WIDTH, HEIGHT)  # Maximum possible distance in the game
         max_count = 10  # Maximum count for characteristics; adjust as needed
         

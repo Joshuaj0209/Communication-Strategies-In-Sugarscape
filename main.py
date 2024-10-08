@@ -15,14 +15,15 @@ def main(render=False):
         font = pygame.font.Font(None, 24)
 
     # Initialize the RL agent once
-    state_size = 24  # Based on your state representation
-    action_size = 6  # N=5 communicated targets + 1 explore action
+    state_size = 44  # Based on your state representation
+    action_size = 11  # N=5 communicated targets + 1 explore action
     shared_agent = AntRLAgent(state_size, action_size)
 
     num_episodes = 200  # Define the number of training episodes
-    episode_length = 20000  # Define the length of each episode in time steps
+    episode_length = 30000  # Define the length of each episode in time steps
 
     episode_rewards = []
+    episode_lifespans = []  # For tracking average lifespans
 
 
     for episode in range(num_episodes):
@@ -50,6 +51,11 @@ def main(render=False):
             sim_time += 1
 
             sugarscape.update(sim_time)
+
+            # Call update_policy() after collecting enough experiences
+            if len(shared_agent.memory) >= shared_agent.batch_size:
+                shared_agent.update_policy()
+            
             if render:
                 game_surface = pygame.Surface((GAME_WIDTH, HEIGHT))
                 sugarscape.draw(game_surface)
@@ -73,8 +79,13 @@ def main(render=False):
 
             # Early termination condition: End the episode if fewer than 'min_ants_alive' remain
             if len(sugarscape.ants) < 3:
+                # After the episode, update policy with remaining experiences
+                if len(shared_agent.memory) > 0:
+                    shared_agent.update_policy()
                 print("Fewer than 3 ants remaining. Ending episode early.")
                 break
+            
+            
 
         # Collect rewards for all ants after the episode ends
         for ant in sugarscape.ants:
@@ -104,6 +115,9 @@ def main(render=False):
         print(f"Average Lifespan: {average_lifespan:.2f}")
         print(f"True Positives: {true_positives}")
 
+        episode_lifespans.append(average_lifespan)
+
+
     # After training, save the trained agent
     shared_agent.save_model("trained_agent.pth")
 
@@ -112,6 +126,14 @@ def main(render=False):
     plt.xlabel('Episode')
     plt.ylabel('Average Reward')
     plt.title('Average Reward per Episode')
+    plt.show()
+
+    # Plot the average lifespan
+    plt.figure()
+    plt.plot(range(1, num_episodes + 1), episode_lifespans)
+    plt.xlabel('Episode')
+    plt.ylabel('Average Lifespan')
+    plt.title('Average Lifespan per Episode')
     plt.show()
 
     if render:
