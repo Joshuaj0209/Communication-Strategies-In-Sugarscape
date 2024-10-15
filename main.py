@@ -15,9 +15,10 @@ def main(render=False):
         font = pygame.font.Font(None, 24)
 
     # Initialize the RL agent once
-    state_size = 44  # Based on your state representation
-    action_size = 11  # N=5 communicated targets + 1 explore action
-    shared_agent = AntRLAgent(state_size, action_size)
+    state_size = 4  # Ant's own state features
+    action_feature_size = 4  # Features per action (communicated target)
+    input_size = state_size + action_feature_size
+    shared_agent = AntRLAgent(input_size)
 
     num_episodes = 200  # Define the number of training episodes
     episode_length = 30000  # Define the length of each episode in time steps
@@ -75,10 +76,10 @@ def main(render=False):
                 screen.blit(analytics_surface, (GAME_WIDTH, 0))
 
                 pygame.display.flip()
-                # clock.tick(60)
+                clock.tick(200)
 
             # Early termination condition: End the episode if fewer than 'min_ants_alive' remain
-            if len(sugarscape.ants) < 3:
+            if len(sugarscape.ants) == 0:
                 # After the episode, update policy with remaining experiences
                 if len(shared_agent.memory) > 0:
                     shared_agent.update_policy()
@@ -141,4 +142,4 @@ def main(render=False):
 
 
 if __name__ == "__main__":
-    main(render=False)  # Run training
+    main(render=True)  # Run training

@@ -27,8 +27,8 @@ class Ant:
         self.lifespan = 0
 
         # Set the mean and standard deviation for the target selection interval
-        self.mean_interval = 700  # Mean interval of 480 frames (~8000 ms)
-        self.std_deviation = 120  # Standard deviation of 120 frames (~2000 ms)
+        self.mean_interval = 500  # Mean interval of 480 frames (~8000 ms)
+        self.std_deviation = 100  # Standard deviation of 120 frames (~2000 ms)
 
         # Use a normal distribution for the first target selection interval
         self.target_selection_interval = max(
@@ -91,43 +91,58 @@ class Ant:
         return False
 
     def select_new_target(self, sugarscape):
-
         self.has_reached_target = False
-
-        # Construct the state
         state = self.get_state()
-        
-        # Use the RL agent to select an action
-        action = self.agent.select_action(state)
-        
-        # Store the state and action for later use
-        self.prev_state = state
-        self.prev_action = action
-
-        # Reset cumulative reward and action tracking
-        self.cumulative_reward = 0
-        self.action_in_progress = True
-        # print("Action has begun for ant ", self.id)
-        
-        # Determine the action
         N = 10  # Number of communicated targets to consider
-
-        # Shuffle the communicated targets to randomize their order
         target_items = list(self.communicated_targets.items())
         random.shuffle(target_items)
-        target_items = target_items[:N]  # Take up to N targets
-
-        if action < len(target_items):
-            # Select the target corresponding to the action
-            location, counts = target_items[action]
-            self.target = location
+        target_items = target_items[:N]
+        possible_actions = []
+        for location, counts in target_items:
+            action_features = []
+            dx = location[0] - self.x
+            dy = location[1] - self.y
+            distance = math.hypot(dx, dy)
+            max_distance = math.hypot(GAME_WIDTH, HEIGHT)
+            distance_normalized = distance / max_distance
+            max_count = 10
+            confirmed_normalized = counts.get('confirmed', 0) / max_count
+            accepted_normalized = counts.get('accepted', 0) / max_count
+            rejected_normalized = counts.get('rejected', 0) / max_count
+            action_features.extend([
+                distance_normalized,
+                confirmed_normalized,
+                accepted_normalized,
+                rejected_normalized,
+            ])
+            possible_actions.append({
+                'type': 'target',
+                'location': location,
+                'features': np.array(action_features, dtype=np.float32)
+            })
+        # Add 'explore' as an action
+        explore_action = {
+            'type': 'explore',
+            'features': np.zeros(4, dtype=np.float32)
+        }
+        possible_actions.append(explore_action)
+        action_index, log_prob = self.agent.select_action(state, possible_actions)
+        self.prev_state = state
+        self.prev_action = action_index
+        self.prev_log_prob = log_prob
+        self.cumulative_reward = 0
+        self.action_in_progress = True
+        selected_action = possible_actions[action_index]
+        if selected_action['type'] == 'target':
+            self.target = selected_action['location']
             self.is_exploring_target = False
             self.broadcast_sugar_location('accepted')
-        else:
-            # Explore
+        elif selected_action['type'] == 'explore':
             self.explore()
-
+            print(f"Ant {self.id} is exploring as per selected action")
             sugarscape.explore_count += 1
+
+
 
     def explore(self):
         # Exploration logic: move randomly within the environment
@@ -275,6 +290,7 @@ class Ant:
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
+                    print("Ant ", self.id, " has selected a new target")
                 else:
                     # No viable targets; explore
                     self.explore()
@@ -283,7 +299,7 @@ class Ant:
                 self.next_target_selection_time = current_time + self.target_selection_interval
         
          # After all possible changes to self.target, check if it has changed
-        if self.action_in_progress and self.target != previous_target:
+        if self.action_in_progress and self.target != previous_target and not self.has_reached_target:
             # The action has been interrupted
             self.agent.store_reward(self.cumulative_reward)
             self.action_in_progress = False
@@ -368,7 +384,7 @@ class Ant:
                 if self.action_in_progress:
                     # Get next state
                     done = not self.is_alive()
-
+                    print("Reward for ant ",self.id,"is ", self.cumulative_reward)
                     self.agent.store_reward(self.cumulative_reward)
                     # No longer calling self.agent.update_policy() here
                     self.action_in_progress = False
@@ -453,61 +469,19 @@ class Ant:
 
     def get_state(self):
         state_features = []
-        
-        # Health level (normalized)
         health_normalized = self.health / self.max_health
         state_features.append(health_normalized)
-        
-        # Number of nearby ants (normalized)
         num_nearby_ants = self.count_nearby_ants()
-        max_possible_ants = NUM_ANTS  # Assuming this is defined in your constants
+        max_possible_ants = NUM_ANTS
         nearby_ants_normalized = num_nearby_ants / max_possible_ants
         state_features.append(nearby_ants_normalized)
-        
-        # Ant's current position (normalized)
         x_normalized = self.x / GAME_WIDTH
         y_normalized = self.y / HEIGHT
         state_features.extend([x_normalized, y_normalized])
-        
-        # Communicated targets
-        N = 10  # Number of communicated targets to include
-        max_distance = math.hypot(GAME_WIDTH, HEIGHT)  # Maximum possible distance in the game
-        max_count = 10  # Maximum count for characteristics; adjust as needed
-        
-        # Get the top N communicated targets
-        communicated_targets_list = list(self.communicated_targets.items())[:N]
-        for location, counts in communicated_targets_list:
-            dx = location[0] - self.x
-            dy = location[1] - self.y
-            distance = math.hypot(dx, dy)
-            
-            # Normalize distance
-            distance_normalized = distance / max_distance
-            
-            # Normalize counts
-            confirmed_normalized = counts.get('confirmed', 0) / max_count
-            accepted_normalized = counts.get('accepted', 0) / max_count
-            rejected_normalized = counts.get('rejected', 0) / max_count
-            
-            # Add to state features
-            state_features.extend([
-                distance_normalized,
-                confirmed_normalized,
-                accepted_normalized,
-                rejected_normalized,
-            ])
-        
-        # Pad the state if there are fewer than N targets
-        num_features_per_target = 4  # Now 4 features per target
-        expected_features = N * num_features_per_target
-        actual_features = len(communicated_targets_list) * num_features_per_target
-        if actual_features < expected_features:
-            state_features.extend([0] * (expected_features - actual_features))
-        
-        # Convert to NumPy array
         state = np.array(state_features, dtype=np.float32)
-        
         return state
+
+
 
     
     def calculate_reward(self):

@@ -9,43 +9,48 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("device: ", device)
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, state_size, action_size):
+    def __init__(self, input_size):
         super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 128)
+        self.fc1 = nn.Linear(input_size, 128)
         self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, action_size)
+        self.fc3 = nn.Linear(128, 1)  # Output a scalar logit
         
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        action_scores = self.fc3(x)
-        action_probs = torch.softmax(action_scores, dim=-1)
-        return action_probs
+        logit = self.fc3(x)
+        return logit
+
 
 class AntRLAgent:
-    def __init__(self, state_size, action_size):
+    def __init__(self, input_size):
         self.is_eval = False
-        self.state_size = state_size
-        self.action_size = action_size
-        self.policy_net = PolicyNetwork(state_size, action_size).to(device)
+        self.policy_net = PolicyNetwork(input_size).to(device)
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=1e-3)
-        self.memory = []  # Shared memory for all ants
-        self.gamma = 0.99  # Discount factor
-        self.batch_size = 128  # Number of experiences before updating policy
+        self.memory = []
+        self.gamma = 0.99
+        self.batch_size = 128
 
-    def select_action(self, state):
-        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
-        action_probs = self.policy_net(state_tensor)
+    def select_action(self, state, possible_actions):
+        state_tensor = torch.FloatTensor(state).to(device)
+        action_logits = []
+        for action in possible_actions:
+            action_features = action['features']
+            input_tensor = torch.cat([state_tensor, torch.FloatTensor(action_features).to(device)])
+            logit = self.policy_net(input_tensor)
+            action_logits.append(logit)
+        action_logits = torch.stack(action_logits).squeeze()
+        action_probs = torch.softmax(action_logits, dim=0)
         if self.is_eval:
-            action = torch.argmax(action_probs, dim=-1).item()
+            action_index = torch.argmax(action_probs).item()
+            log_prob = None
         else:
             action_distribution = torch.distributions.Categorical(action_probs)
-            action = action_distribution.sample()
-            log_prob = action_distribution.log_prob(action)
-            # Store the log probability for later
+            action_index = action_distribution.sample()
+            log_prob = action_distribution.log_prob(action_index)
             self.memory.append({'log_prob': log_prob, 'reward': None})
-            action = action.item()
-        return action
+        return action_index, log_prob
+
 
     def store_reward(self, reward):
         if self.is_eval:

@@ -83,7 +83,7 @@ class SugarScape:
         self.ants = alive_ants
 
         if current_time >= self.next_sugar_time:
-            self.add_new_sugar_patch()
+            # self.add_new_sugar_patch()
             self.next_sugar_time += NEW_SUGAR_INTERVAL
 
 
@@ -128,6 +128,8 @@ class SugarScape:
             else:
                 pygame.draw.rect(screen, YELLOW, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
         
+        font = pygame.font.Font(None, 24)
+
         # Draw ants and their communication radius
         for ant in self.ants:
             # Draw the communication radius as a circle around the ant
@@ -136,7 +138,12 @@ class SugarScape:
             # Draw the ant itself
             color = GREEN if ant in self.false_broadcasters else RED
             pygame.draw.circle(screen, color, (int(ant.x), int(ant.y)), ANT_SIZE)
-        
+
+            # Render and draw the ant's ID number on top of it
+            ant_id_text = font.render(str(ant.id), True, BLACK)  # Convert ant.id to string
+            text_rect = ant_id_text.get_rect(center=(int(ant.x), int(ant.y) - ANT_SIZE - 10))  # Position text above the ant
+            screen.blit(ant_id_text, text_rect)
+            
         # Collect all false broadcast locations from false broadcasters
         false_locations = set()
         for ant in self.false_broadcasters:
