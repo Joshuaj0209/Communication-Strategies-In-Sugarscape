@@ -64,7 +64,7 @@ class Ant:
 
         self.arrived_at_target = False  # Flag to indicate arrival at target (necessary for the delayed reward)
         self.frames_since_arrival = 0   # Counter for frames since arrival
-        self.max_arrival_frames = 40    # Number of frames to wait after arrival
+        self.max_arrival_frames = 50    # Number of frames to wait after arrival
 
         self.total_episode_reward = 0  # Track total reward for the episode
 
@@ -73,6 +73,7 @@ class Ant:
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
         closest_distance = float('inf')
+        target_changed = False
 
         for sugar in sugar_patches:
             if sugar['count'] > 0:  # Only consider patches with sugar
@@ -85,12 +86,14 @@ class Ant:
                     closest_distance = distance
 
         if closest_sugar and self.needs_to_eat():
+            if self.target != (closest_sugar['x'], closest_sugar['y']):
+                # Target is changing
+                target_changed = True
             self.target = (closest_sugar['x'], closest_sugar['y'])
             self.target_patch_center = (closest_sugar['x'], closest_sugar['y'])
-            return True
+            return True, target_changed
 
-        return False
-
+        return False, False
 
     def select_new_target(self, sugarscape):
         self.has_reached_target = False
@@ -141,9 +144,11 @@ class Ant:
             self.target = selected_action['location']
             self.is_exploring_target = False
             self.broadcast_sugar_location('accepted')
+            print("Ant ", self.id, " has selected a new target")
+
         elif selected_action['type'] == 'explore':
             self.explore()
-            # print(f"Ant {self.id} is exploring as per selected action")
+            print(f"Ant {self.id} is exploring as per selected action")
             sugarscape.explore_count += 1
 
 
@@ -154,6 +159,25 @@ class Ant:
         self.target = None  # Ensure no target is set
 
         self.is_exploring_target = True  # Mark this target as an exploration target
+
+    def end_current_action(self, interrupted=False):
+        # Calculate and store the reward
+        self.cumulative_reward = self.calculate_reward()
+        print(f"Reward for ant {self.id} is {self.cumulative_reward} (Interrupted: {interrupted})")
+        self.agent.store_reward(self.cumulative_reward)
+        self.action_in_progress = False
+        self.health_at_action_start = None  # Reset health at action start
+        self.cumulative_reward = 0
+        self.arrived_at_target = False  # Reset arrival flags
+        self.frames_since_arrival = 0
+
+        if not interrupted:
+            # Only update state if the action wasn't interrupted
+            if not self.is_alive():
+                self.prev_state = None
+            else:
+                self.prev_state = self.get_state()
+
 
 
     def broadcast_sugar_location(self, characteristic, false_location=False):
@@ -227,7 +251,13 @@ class Ant:
         # Store the previous target before detecting sugar
         previous_target = self.target
 
-        sugar_detected = self.detect_sugar(sugar_patches)
+        sugar_detected, target_changed = self.detect_sugar(sugar_patches)
+
+        if self.action_in_progress and target_changed and not self.has_reached_target and not self.arrived_at_target:
+            # The action has been interrupted due to detecting new sugar
+            self.end_current_action(interrupted=True)
+            self.next_target_selection_time = current_time + self.target_selection_interval
+
 
         # Store the previous broadcast characteristic and location
         previous_characteristic = self.current_broadcast_characteristic
@@ -294,7 +324,6 @@ class Ant:
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
-                    print("Ant ", self.id, " has selected a new target")
                 else:
                     # No viable targets; explore
                     self.explore()
@@ -359,21 +388,10 @@ class Ant:
                 self.target = None  # Clear the target after reaching it
                 self.is_exploring_target = None  # Reset the flag
 
-                 # End the action immediately upon reaching the target
-                if self.action_in_progress:
-                    # Get next state
-                    done = not self.is_alive()
-                    self.cumulative_reward = self.calculate_reward()
-                    print("Reward for ant", self.id, "is", self.cumulative_reward)
-                    self.agent.store_reward(self.cumulative_reward)
-                    self.action_in_progress = False
-                    self.cumulative_reward = 0
-                    self.health_at_action_start = None  # Reset health at action start
-
-                    if not done:
-                        self.prev_state = self.get_state()
-
-                self.next_target_selection_time = current_time + self.target_selection_interval
+                # Start the arrival timer
+                if not self.arrived_at_target:
+                    self.arrived_at_target = True
+                    self.frames_since_arrival = 0
 
 
             else:
@@ -397,21 +415,9 @@ class Ant:
 
                 # End the action after the reward accumulation window is over
                 if self.action_in_progress:
-                    # Get next state
-                    done = not self.is_alive()
-                    print("Reward for ant ",self.id,"is ", self.cumulative_reward)
-                    self.agent.store_reward(self.cumulative_reward)
-                    # No longer calling self.agent.update_policy() here
-                    self.action_in_progress = False
-                    self.cumulative_reward = 0
-
-                    # If still alive, update the previous state
-                    if not done:
-                        self.prev_state = self.get_state()
+                    self.end_current_action()
 
                     self.next_target_selection_time = current_time + self.target_selection_interval
-
-        
 
         self.x += ANT_SPEED * math.cos(self.direction)
         self.y += ANT_SPEED * math.sin(self.direction)
@@ -449,15 +455,9 @@ class Ant:
         done = not self.is_alive()
         if done:
             if self.action_in_progress:
-                self.cumulative_reward = self.calculate_reward()
-                print("Reward for ant", self.id, "is", self.cumulative_reward)
-                self.agent.store_reward(self.cumulative_reward)
-                # No longer calling self.agent.update_policy() here
-                self.action_in_progress = False
-                self.cumulative_reward = 0
+                self.end_current_action()
 
                 self.next_target_selection_time = current_time + self.target_selection_interval
-                self.health_at_action_start = None  # Reset health at action start
 
 
 
