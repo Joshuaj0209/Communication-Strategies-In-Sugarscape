@@ -1,102 +1,172 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import random
-import numpy as np
+import pygame
+import sys
+import time  # Add this import for timing
+from constants import *
+from sugarscape import SugarScape
+import matplotlib.pyplot as plt  # Import for plotting
+from rl_agent import AntRLAgent  # Add this import
+import os  # Import for directory handling
 
-# Set up the device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("device: ", device)
+def main(render=False):
+    if render:
+        pygame.init()
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("SugarScape Simulation with Analytics")
+        clock = pygame.time.Clock()
+        font = pygame.font.Font(None, 24)
 
-class PolicyNetwork(nn.Module):
-    def __init__(self, input_size):
-        super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_size, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 1)  # Output a scalar logit
-        
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        logit = self.fc3(x)
-        return logit
+    # Initialize the RL agent once
+    state_size = 4  # Ant's own state features
+    action_feature_size = 4  # Features per action (communicated target)
+    input_size = state_size + action_feature_size
+    shared_agent = AntRLAgent(input_size)
+
+    num_episodes = 200  # Define the number of training episodes
+    episode_length = 30000  # Define the length of each episode in time steps
+
+    episode_rewards = []
+    episode_lifespans = []  # For tracking average lifespans
+
+    # Create a 'checkpoints' directory if it doesn't exist
+    checkpoint_dir = "checkpoints"
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
+
+    for episode in range(num_episodes):
+        print(f"Starting Episode {episode + 1}/{num_episodes}")
+
+        # Start timing the episode
+        episode_start_time = time.time()  # Start time of the episode
+
+        # Initialize the environment for each episode
+        sugarscape = SugarScape(shared_agent)
+        sim_time = 0  # Initialize simulation time
+
+        # Track the total reward for all ants
+        total_rewards = []
+
+        running = True
+        while running and sim_time < episode_length:
+            if render:  # Only check Pygame events when rendering is enabled
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                        pygame.quit()
+                        sys.exit()
+
+            sim_time += 1
+
+            sugarscape.update(sim_time)
+
+            # Call update_policy() after collecting enough experiences
+            if len(shared_agent.memory) >= shared_agent.batch_size:
+                shared_agent.update_policy()
+            
+            if render:
+                game_surface = pygame.Surface((GAME_WIDTH, HEIGHT))
+                sugarscape.draw(game_surface)
+                screen.blit(game_surface, (0, 0))
+
+                analytics_surface = pygame.Surface((ANALYTICS_WIDTH, HEIGHT))
+                analytics_surface.fill(WHITE)
+                pygame.draw.line(analytics_surface, GRAY, (0, 0), (0, HEIGHT), 3)
+
+                analytics_data = sugarscape.get_analytics_data()
+                y_offset = 20
+                for key, value in analytics_data.items():
+                    text = font.render(f"{key}: {value}", True, BLACK)
+                    analytics_surface.blit(text, (10, y_offset))
+                    y_offset += 30
+
+                screen.blit(analytics_surface, (GAME_WIDTH, 0))
+
+                pygame.display.flip()
+                # clock.tick(60)
+
+            # Early termination condition: End the episode if fewer than 'min_ants_alive' remain
+            if len(sugarscape.ants) < 3:
+                # After the episode, update policy with remaining experiences
+                if len(shared_agent.memory) > 0:
+                    shared_agent.update_policy()
+                print("Fewer than 3 ants remaining. Ending episode early.")
+                break
 
 
-class AntRLAgent:
-    def __init__(self, input_size):
-        self.is_eval = False
-        self.policy_net = PolicyNetwork(input_size).to(device)
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=1e-3)
-        self.memory = []
-        self.gamma = 0.99
-        self.batch_size = 128
+        # Collect rewards for all ants after the episode ends
+        for ant in sugarscape.ants:
+            total_rewards.append(ant.total_episode_reward)
 
-    def select_action(self, state, possible_actions):
-        state_tensor = torch.FloatTensor(state).to(device)
-        action_logits = []
-        for action in possible_actions:
-            action_features = action['features']
-            input_tensor = torch.cat([state_tensor, torch.FloatTensor(action_features).to(device)])
-            logit = self.policy_net(input_tensor)
-            action_logits.append(logit)
-        action_logits = torch.stack(action_logits).squeeze()
-        action_probs = torch.softmax(action_logits, dim=0)
-        if self.is_eval:
-            action_index = torch.argmax(action_probs).item()
-            log_prob = None
+        # End of episode timing
+        episode_end_time = time.time()  # End time of the episode
+        episode_duration = episode_end_time - episode_start_time  # Calculate duration
+
+        # Compute the average reward for the episode
+        if total_rewards:
+            average_reward = sum(total_rewards) / len(total_rewards)
         else:
-            action_distribution = torch.distributions.Categorical(action_probs)
-            action_index = action_distribution.sample()
-            log_prob = action_distribution.log_prob(action_index)
-            self.memory.append({'log_prob': log_prob, 'reward': None})
-        return action_index, log_prob
+            average_reward = 0
 
+        print(f"Episode {episode + 1}; Duration: {episode_duration:.2f} seconds; Average Reward: {average_reward:.2f}")
 
-    def store_reward(self, reward):
-        if self.is_eval:
-            return  # Do not store rewards during evaluation
-        if self.memory and self.memory[-1]['reward'] is None:
-            self.memory[-1]['reward'] = reward
+        # Store the average reward for this episode
+        episode_rewards.append(average_reward)
 
-    def update_policy(self):
-        if self.is_eval:
-            return  # Do not update policy during evaluation
-        if len(self.memory) < self.batch_size:
-            return  # Not enough experiences to perform update
-        # Check that all rewards are available
-        if any(step['reward'] is None for step in self.memory):
-            return  # Wait until all rewards are available
-        # Proceed with policy update
-        memory = self.memory
-        R = 0
-        returns = []
-        for step in reversed(memory):
-            R = step['reward'] + self.gamma * R
-            returns.insert(0, R)
-        returns = torch.tensor(returns).to(device)
-        # Normalize returns
-        returns = (returns - returns.mean()) / (returns.std() + 1e-9)
-        # Compute policy loss
-        policy_loss = []
-        for i, step in enumerate(memory):
-            log_prob = step['log_prob']
-            R = returns[i]
-            policy_loss.append(-log_prob * R)
-        # Perform policy update
-        self.optimizer.zero_grad()
-        policy_loss = torch.cat(policy_loss).sum()
-        policy_loss.backward()
-        self.optimizer.step()
-        # Clear memory
-        self.memory = []
+        # End of episode processing (optional)
+        # You can collect metrics, adjust parameters, etc.
+        analytics_data = sugarscape.get_analytics_data()
+        average_lifespan = analytics_data.get('Average Lifespan', 0)
+        true_positives = analytics_data.get('True Positives', 0)
+        print(f"Episode Time: {sim_time}")
+        print(f"Average Lifespan: {average_lifespan:.2f}")
+        print(f"True Positives: {true_positives}")
 
+        episode_lifespans.append(average_lifespan)
 
-    def save_model(self, file_path):
-        torch.save(self.policy_net.state_dict(), file_path)
-        print(f"Model saved to {file_path}")
+        # **Add Checkpoint Saving Here**
+        # Save checkpoint every 100 episodes
+        if (episode + 1) % 100 == 0:
+            checkpoint_episode = episode + 1
+            plt.figure(figsize=(10, 6))
+            plt.plot(range(1, checkpoint_episode + 1), episode_rewards, label='Average Reward')
+            plt.xlabel('Episode')
+            plt.ylabel('Average Reward')
+            plt.title(f'Average Reward per Episode up to Episode {checkpoint_episode}')
+            plt.legend()
+            checkpoint_path = os.path.join(checkpoint_dir, f'average_reward_{checkpoint_episode}.png')
+            plt.savefig(checkpoint_path)
+            plt.close()
+            print(f"Checkpoint saved: {checkpoint_path}")
 
-    def load_model(self, file_path):
-        self.policy_net.load_state_dict(torch.load(file_path, map_location=device))
-        self.policy_net.eval()  # Set the network to evaluation mode
-        self.is_eval = True  # Set evaluation flag
-        print(f"Model loaded from {file_path}")
+    # After training, save the trained agent
+    shared_agent.save_model("trained_agent.pth")
+    print("Trained agent saved as 'trained_agent.pth'.")
+
+    # Plot the final rewards
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, num_episodes + 1), episode_rewards, label='Average Reward')
+    plt.xlabel('Episode')
+    plt.ylabel('Average Reward')
+    plt.title('Average Reward per Episode')
+    plt.legend()
+    final_reward_plot = os.path.join(checkpoint_dir, f'average_reward_final.png')
+    plt.savefig(final_reward_plot)
+    plt.show()
+    print(f"Final reward plot saved: {final_reward_plot}")
+
+    # Plot the average lifespan
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, num_episodes + 1), episode_lifespans, label='Average Lifespan', color='orange')
+    plt.xlabel('Episode')
+    plt.ylabel('Average Lifespan')
+    plt.title('Average Lifespan per Episode')
+    plt.legend()
+    lifespan_plot = os.path.join(checkpoint_dir, f'average_lifespan_final.png')
+    plt.savefig(lifespan_plot)
+    plt.show()
+    print(f"Final lifespan plot saved: {lifespan_plot}")
+
+    if render:
+        pygame.quit()
+
+if __name__ == "__main__":
+    main(render=False)  # Run training

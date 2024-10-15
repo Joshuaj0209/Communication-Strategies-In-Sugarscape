@@ -106,6 +106,8 @@ class Ant:
         target_items = target_items[:N]
         possible_actions = []
         for location, counts in target_items:
+            if location in self.confirmed_false_locations:
+                continue  # Skip this location
             action_features = []
             dx = location[0] - self.x
             dy = location[1] - self.y
@@ -144,11 +146,11 @@ class Ant:
             self.target = selected_action['location']
             self.is_exploring_target = False
             self.broadcast_sugar_location('accepted')
-            print("Ant ", self.id, " has selected a new target")
+            # print("Ant ", self.id, " has selected a new target")
 
         elif selected_action['type'] == 'explore':
             self.explore()
-            print(f"Ant {self.id} is exploring as per selected action")
+            # print(f"Ant {self.id} is exploring as per selected action")
             sugarscape.explore_count += 1
 
 
@@ -163,20 +165,30 @@ class Ant:
     def end_current_action(self, interrupted=False):
         # Calculate and store the reward
         self.cumulative_reward = self.calculate_reward()
-        print(f"Reward for ant {self.id} is {self.cumulative_reward} (Interrupted: {interrupted})")
+        # print(f"Reward for ant {self.id} is {self.cumulative_reward} (Interrupted: {interrupted})")
         self.agent.store_reward(self.cumulative_reward)
+        # Also accumulate to total_episode_reward
+        self.total_episode_reward += self.cumulative_reward
         self.action_in_progress = False
         self.health_at_action_start = None  # Reset health at action start
         self.cumulative_reward = 0
         self.arrived_at_target = False  # Reset arrival flags
         self.frames_since_arrival = 0
 
-        if not interrupted:
-            # Only update state if the action wasn't interrupted
-            if not self.is_alive():
-                self.prev_state = None
-            else:
-                self.prev_state = self.get_state()
+
+
+        # if not interrupted:
+        #     # Only update state if the action wasn't interrupted
+        #     if not self.is_alive():
+        #         self.prev_state = None
+        #     else:
+        #         self.prev_state = self.get_state()
+
+        # Always update the state based on the current environment
+        if not self.is_alive():
+            self.prev_state = None
+        else:
+            self.prev_state = self.get_state()
 
 
 
@@ -206,6 +218,8 @@ class Ant:
                 dist = math.hypot(dx, dy)
 
                 if dist <= COMMUNICATION_RADIUS:
+                    if location in other_ant.confirmed_false_locations:
+                        continue  # Skip this location
                     # Initialize 'already_communicated' entry for other_ant if not present
                     if other_ant not in self.already_communicated:
                         self.already_communicated[other_ant] = {}
@@ -376,7 +390,7 @@ class Ant:
                         break
 
                 if not found_sugar:
-                    print("Ant ", self.id, "arrived at a false location")
+                    # print("Ant ", self.id, "arrived at a false location")
                     self.confirmed_false_locations.add(self.target)
                     if not self.is_exploring_target and not self.has_reached_target:
                         self.just_reached_false_target = True
@@ -448,8 +462,7 @@ class Ant:
         # if self.action_in_progress:
         #     self.cumulative_reward += reward
 
-        # # Also accumulate to total_episode_reward
-        # self.total_episode_reward += reward
+
         
         # Check if the ant is dead
         done = not self.is_alive()
@@ -458,9 +471,6 @@ class Ant:
                 self.end_current_action()
 
                 self.next_target_selection_time = current_time + self.target_selection_interval
-
-
-
 
     def needs_to_eat(self):
         return self.health < self.initial_health
@@ -481,8 +491,7 @@ class Ant:
                 distance = math.hypot(dx, dy)
                 if distance <= DETECTION_RADIUS:
                     count += 1
-        return count
-    
+        return count   
 
     #RL stuff
 
@@ -500,9 +509,6 @@ class Ant:
         state = np.array(state_features, dtype=np.float32)
         return state
 
-
-
-    
     def calculate_reward(self):
         # Ensure health_at_action_start is set
         if self.health_at_action_start is not None:

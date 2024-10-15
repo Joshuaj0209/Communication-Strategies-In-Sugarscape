@@ -51,7 +51,7 @@ class SugarScape:
             patch = {
                 'x': x,
                 'y': y,
-                'count': 100,  # Starting sugar count
+                'count': 70,  # Starting sugar count
                 'radius': SUGAR_PATCH_RADIUS
             }
             patches.append(patch)
@@ -78,14 +78,14 @@ class SugarScape:
         self.ants = alive_ants
 
         if current_time >= self.next_sugar_time:
-            # self.add_new_sugar_patch()
+            self.add_new_sugar_patch()
             self.next_sugar_time += NEW_SUGAR_INTERVAL
 
 
 
     def add_new_sugar_patch(self):
         max_attempts = 100
-        min_distance = 150
+        min_distance = 180
         padding = 20
 
         for attempt in range(max_attempts):
@@ -97,7 +97,7 @@ class SugarScape:
             )
 
             if not too_close:
-                patch = {'x': x, 'y': y, 'count': 100, 'radius': SUGAR_PATCH_RADIUS}
+                patch = {'x': x, 'y': y, 'count': 70, 'radius': SUGAR_PATCH_RADIUS}
                 self.sugar_patches.append(patch)
                 break
 
@@ -111,11 +111,19 @@ class SugarScape:
         # Draw the sugar patches
         for sugar in self.sugar_patches:
             if sugar['count'] > 0:
-                pygame.draw.circle(screen, GREEN, (int(sugar['x']), int(sugar['y'])), sugar['radius'])
-                # Draw the sugar count
+                color = GREEN
+            else:
+                color = GRAY  # Use a different color for depleted patches
+            pygame.draw.circle(screen, color, (int(sugar['x']), int(sugar['y'])), sugar['radius'])
+            
+            # Draw the sugar count (only if count > 0)
+            if sugar['count'] > 0:
                 count_text = font.render(str(sugar['count']), True, BLACK)
-                text_rect = count_text.get_rect(center=(int(sugar['x']), int(sugar['y'])))
-                screen.blit(count_text, text_rect)
+            else:
+                count_text = font.render("0", True, RED)  # Indicate depleted with "0" in red
+            
+            text_rect = count_text.get_rect(center=(int(sugar['x']), int(sugar['y'])))
+            screen.blit(count_text, text_rect)
 
         # Draw ants and their communication radius
         for ant in self.ants:
