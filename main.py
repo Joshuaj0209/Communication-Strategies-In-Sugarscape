@@ -76,7 +76,7 @@ def main(render=False):
                 screen.blit(analytics_surface, (GAME_WIDTH, 0))
 
                 pygame.display.flip()
-                clock.tick(200)
+                clock.tick(60)
 
             # Early termination condition: End the episode if fewer than 'min_ants_alive' remain
             if len(sugarscape.ants) == 0:

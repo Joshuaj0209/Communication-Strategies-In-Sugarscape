@@ -67,31 +67,35 @@ class Ant:
         self.max_arrival_frames = 40    # Number of frames to wait after arrival
 
         self.total_episode_reward = 0  # Track total reward for the episode
+
+        self.health_at_action_start = None  # Initialize to None
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
         closest_distance = float('inf')
 
         for sugar in sugar_patches:
-            if sugar[2]:  # Check if sugar is available
-                dx = sugar[0] - self.x
-                dy = sugar[1] - self.y
-                distance = math.sqrt(dx**2 + dy**2)
+            if sugar['count'] > 0:  # Only consider patches with sugar
+                dx = sugar['x'] - self.x
+                dy = sugar['y'] - self.y
+                distance = math.hypot(dx, dy)
 
                 if distance < DETECTION_RADIUS and distance < closest_distance:
                     closest_sugar = sugar
                     closest_distance = distance
 
         if closest_sugar and self.needs_to_eat():
-            self.target = (closest_sugar[0], closest_sugar[1])
-            # Set the target patch center for broadcasting
-            self.target_patch_center = closest_sugar[3]  # Use the center of the sugar patch
+            self.target = (closest_sugar['x'], closest_sugar['y'])
+            self.target_patch_center = (closest_sugar['x'], closest_sugar['y'])
             return True
-        
+
         return False
+
 
     def select_new_target(self, sugarscape):
         self.has_reached_target = False
+        self.health_at_action_start = self.health  # Record health at action start
+
         state = self.get_state()
         N = 10  # Number of communicated targets to consider
         target_items = list(self.communicated_targets.items())
@@ -139,7 +143,7 @@ class Ant:
             self.broadcast_sugar_location('accepted')
         elif selected_action['type'] == 'explore':
             self.explore()
-            print(f"Ant {self.id} is exploring as per selected action")
+            # print(f"Ant {self.id} is exploring as per selected action")
             sugarscape.explore_count += 1
 
 
@@ -286,7 +290,7 @@ class Ant:
                 self.broadcast_sugar_location('confirmed', false_location=True)
 
         # Movement logic that might change self.target
-        if not sugar_detected and not self.target and self.needs_to_eat():
+        if not sugar_detected and not self.target and self.needs_to_eat() and not self.action_in_progress:
             if current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
@@ -298,15 +302,15 @@ class Ant:
                 self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
                 self.next_target_selection_time = current_time + self.target_selection_interval
         
-         # After all possible changes to self.target, check if it has changed
-        if self.action_in_progress and self.target != previous_target and not self.has_reached_target:
-            # The action has been interrupted
-            self.agent.store_reward(self.cumulative_reward)
-            self.action_in_progress = False
-            self.cumulative_reward = 0
+        #  # After all possible changes to self.target, check if it has changed
+        # if self.action_in_progress and self.target != previous_target and not self.has_reached_target:
+        #     # The action has been interrupted
+        #     self.agent.store_reward(self.cumulative_reward)
+        #     self.action_in_progress = False
+        #     self.cumulative_reward = 0
 
-            # print(f"Target changed. Previous target: {previous_target}, Current target: {self.target}")
-            self.next_target_selection_time = current_time + self.target_selection_interval
+        #     print(f"Target changed. Previous target: {previous_target}, Current target: {self.target}")
+        #     self.next_target_selection_time = current_time + self.target_selection_interval
 
 
         if self.target:
@@ -316,50 +320,61 @@ class Ant:
 
             if distance < ANT_SPEED:
                 self.x, self.y = self.target
+                found_sugar = False
 
-                # Check if the target is within any sugar patch (regardless of sugar presence)
-                is_sugar_location = any(
-                    math.hypot(sugar[0] - self.x, sugar[1] - self.y) < SUGAR_RADIUS
-                    for sugar in self.sugarscape.sugar_patches
-                )
+                # Check if ant is within any sugar patch
+                for sugar in self.sugarscape.sugar_patches:
+                    dx = sugar['x'] - self.x
+                    dy = sugar['y'] - self.y
+                    distance_to_sugar = math.hypot(dx, dy)
 
-                # Check if there is sugar present at the location
-                found_sugar = any(
-                    sugar[2] and math.hypot(sugar[0] - self.x, sugar[1] - self.y) < SUGAR_RADIUS
-                    for sugar in self.sugarscape.sugar_patches
-                )
+                    if distance_to_sugar <= sugar['radius'] and sugar['count'] > 0:
+                        found_sugar = True
+                        self.confirmed_true_locations.add(self.target)
+                        # print("Ant ", self.id, "arrived at a True location")
 
-                if is_sugar_location:
-                    self.confirmed_true_locations.add(self.target)
-                    if not self.is_exploring_target and not self.has_reached_target:
-                        self.just_reached_true_target = True  # Set reward flag
-                    if found_sugar:
-                        # Handle sugar consumption
+
+                        if not self.is_exploring_target and not self.has_reached_target:
+                            self.just_reached_true_target = True
+
                         if self.needs_to_eat():
-                            for sugar in self.sugarscape.sugar_patches:
-                                if sugar[2] and math.hypot(sugar[0] - self.x, sugar[1] - self.y) < SUGAR_RADIUS:
-                                    sugar[2] = False  # Mark sugar as consumed
-                                    self.sugarscape.consumed_sugar_count += 1
-                                    self.eat_sugar()
-                                    self.just_ate_sugar = True  # Set reward flag
-                                    break  # Consume only one sugar
-                else:
+                            sugar['count'] -= 1
+                            if sugar['count'] <= 0:
+                                # Optionally remove or mark the sugar patch as depleted
+                                pass
+                            self.eat_sugar()
+                            self.just_ate_sugar = True
+                        break
+
+                if not found_sugar:
+                    print("Ant ", self.id, "arrived at a false location")
                     self.confirmed_false_locations.add(self.target)
                     if not self.is_exploring_target and not self.has_reached_target:
-                        self.just_reached_false_target = True  # Set reward flag
-                    self.just_visited_false_location = True  # Set reward flag
-                
-                # Set has_reached_target to True to prevent repeated rewards
-                self.has_reached_target = True
+                        self.just_reached_false_target = True
+                    self.just_visited_false_location = True
 
-                # After reaching the target, store it as last_location
+                # Set has_reached_target to prevent repeated rewards
+                self.has_reached_target = True
                 self.last_location = self.target
                 self.target = None  # Clear the target after reaching it
                 self.is_exploring_target = None  # Reset the flag
 
-                # Set arrived_at_target flag and reset frame counter
-                self.arrived_at_target = True
-                self.frames_since_arrival = 0
+                 # End the action immediately upon reaching the target
+                if self.action_in_progress:
+                    # Get next state
+                    done = not self.is_alive()
+                    self.cumulative_reward = self.calculate_reward()
+                    print("Reward for ant", self.id, "is", self.cumulative_reward)
+                    self.agent.store_reward(self.cumulative_reward)
+                    self.action_in_progress = False
+                    self.cumulative_reward = 0
+                    self.health_at_action_start = None  # Reset health at action start
+
+                    if not done:
+                        self.prev_state = self.get_state()
+
+                self.next_target_selection_time = current_time + self.target_selection_interval
+
 
             else:
                 self.direction = math.atan2(dy, dx)
@@ -422,24 +437,28 @@ class Ant:
                     del self.already_communicated[other_ant]
             # Do not reset current_broadcast_characteristic here, since we continue broadcasting after reaching the target
         
-        # Calculate and accumulate the reward
-        reward = self.calculate_reward()
-        if self.action_in_progress:
-            self.cumulative_reward += reward
+        # # Calculate and accumulate the reward
+        # reward = self.calculate_reward()
+        # if self.action_in_progress:
+        #     self.cumulative_reward += reward
 
-        # Also accumulate to total_episode_reward
-        self.total_episode_reward += reward
+        # # Also accumulate to total_episode_reward
+        # self.total_episode_reward += reward
         
         # Check if the ant is dead
         done = not self.is_alive()
         if done:
             if self.action_in_progress:
+                self.cumulative_reward = self.calculate_reward()
+                print("Reward for ant", self.id, "is", self.cumulative_reward)
                 self.agent.store_reward(self.cumulative_reward)
                 # No longer calling self.agent.update_policy() here
                 self.action_in_progress = False
                 self.cumulative_reward = 0
 
                 self.next_target_selection_time = current_time + self.target_selection_interval
+                self.health_at_action_start = None  # Reset health at action start
+
 
 
 
@@ -485,19 +504,24 @@ class Ant:
 
     
     def calculate_reward(self):
-        # Reward for survival
-        reward = 1  # Positive reward per time step for being alive
+        # Ensure health_at_action_start is set
+        if self.health_at_action_start is not None:
+            health_change = self.health - self.health_at_action_start
+        else:
+            health_change = 0  # No health change if health_at_action_start is None
 
-        # Reward or penalty based on health change
-        health_change = self.health - self.previous_health
-        reward += health_change  # Positive if health increased, negative if decreased
+        # Base reward can be adjusted as needed
+        base_reward = 0  # No base reward per action unless desired
 
-        # Update previous health for the next time step
-        self.previous_health = self.health
+        # Total reward is based on health change
+        reward = base_reward + health_change
 
-        # Optional: Remove or adjust the time penalty
-        # reward -= 0.1  # If you want to encourage efficiency
+        # Optionally, you can add penalties or bonuses based on other factors
+        # For example, penalize time taken if you wish
+        # time_penalty = - (self.lifespan - self.action_start_time)
+        # reward += time_penalty
 
         return reward
+
 
 

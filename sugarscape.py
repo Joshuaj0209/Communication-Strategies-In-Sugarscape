@@ -47,21 +47,16 @@ class SugarScape:
 
     def initialize_sugar_patches(self):
         patches = []
-        grid_size = int(math.sqrt(SUGAR_MAX))
-        half_grid = grid_size // 2
-        
         for (x, y) in self.sugar_spots:
-            # Calculate the center of the patch
-            center_x = x
-            center_y = y
-            
-            for n in range(SUGAR_MAX):
-                square_x = x + (n % grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
-                square_y = y + (n // grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
-                # Store the sugar location along with the center of the patch
-                patches.append([square_x, square_y, True, (center_x, center_y)])
-        
+            patch = {
+                'x': x,
+                'y': y,
+                'count': 100,  # Starting sugar count
+                'radius': SUGAR_PATCH_RADIUS
+            }
+            patches.append(patch)
         return patches
+
 
     def update(self, sim_time):
         current_time = sim_time
@@ -89,46 +84,38 @@ class SugarScape:
 
 
     def add_new_sugar_patch(self):
-        max_attempts = 100  
-        min_distance = 150  
-
-        grid_size = int(math.sqrt(SUGAR_MAX)) 
-        half_grid = grid_size // 2
-
-        patch_size = int(math.sqrt(SUGAR_MAX)) * SQUARE_SIZE  # Calculate patch size based on SUGAR_MAX
-        padding = 20 
+        max_attempts = 100
+        min_distance = 150
+        padding = 20
 
         for attempt in range(max_attempts):
-            # Ensure x and y are within the allowed area, considering the patch size and padding
-            x = random.randint(padding + patch_size // 2, GAME_WIDTH - padding - patch_size // 2)
-            y = random.randint(padding + patch_size // 2, HEIGHT - padding - patch_size // 2)
+            x = random.randint(padding + SUGAR_PATCH_RADIUS, GAME_WIDTH - padding - SUGAR_PATCH_RADIUS)
+            y = random.randint(padding + SUGAR_PATCH_RADIUS, HEIGHT - padding - SUGAR_PATCH_RADIUS)
 
-            too_close = any(math.sqrt((x - sugar[0]) ** 2 + (y - sugar[1]) ** 2) < min_distance for sugar in self.sugar_patches)
-            
+            too_close = any(
+                math.hypot(x - sugar['x'], y - sugar['y']) < min_distance for sugar in self.sugar_patches
+            )
+
             if not too_close:
-                # Calculate the center of the patch
-                center_x = x
-                center_y = y
-                
-                for n in range(SUGAR_MAX):
-                    square_x = x + (n % grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
-                    square_y = y + (n // grid_size) * SQUARE_SIZE - half_grid * SQUARE_SIZE
-                    # Store the sugar location along with the center of the patch
-                    self.sugar_patches.append([square_x, square_y, True, (center_x, center_y)])
+                patch = {'x': x, 'y': y, 'count': 100, 'radius': SUGAR_PATCH_RADIUS}
+                self.sugar_patches.append(patch)
                 break
+
 
 
     def draw(self, screen):
         screen.fill(WHITE)
-        
+
+        font = pygame.font.Font(None, 24)
+     
         # Draw the sugar patches
         for sugar in self.sugar_patches:
-            if sugar[2]:
-                pygame.draw.rect(screen, GREEN, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
-            else:
-                pygame.draw.rect(screen, YELLOW, (sugar[0], sugar[1], SQUARE_SIZE, SQUARE_SIZE))
-        
-        font = pygame.font.Font(None, 24)
+            if sugar['count'] > 0:
+                pygame.draw.circle(screen, GREEN, (int(sugar['x']), int(sugar['y'])), sugar['radius'])
+                # Draw the sugar count
+                count_text = font.render(str(sugar['count']), True, BLACK)
+                text_rect = count_text.get_rect(center=(int(sugar['x']), int(sugar['y'])))
+                screen.blit(count_text, text_rect)
 
         # Draw ants and their communication radius
         for ant in self.ants:
@@ -166,10 +153,12 @@ class SugarScape:
         total_ants = self.dead_ants_count + len(self.ants)  # Total number of ants, dead + alive
         average_lifespan = total_lifespan / total_ants if total_ants > 0 else 0  # Calculate average
 
+        # total_remaining_sugar = sum(sugar['count'] for sugar in self.sugar_patches)
+
         return {
             'Total Sugar Patches': len(self.sugar_patches),
             'Consumed Sugar': self.consumed_sugar_count,
-            'Remaining Sugar': len([s for s in self.sugar_patches if s[2]]),
+            # 'Remaining Sugar': len([s for s in self.sugar_patches if s[2]]),
             'Number of Ants': len(self.ants),
             'Dead Ants': self.dead_ants_count,
             'Average Lifespan': average_lifespan,
