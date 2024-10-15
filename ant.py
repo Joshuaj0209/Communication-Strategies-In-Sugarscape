@@ -129,12 +129,13 @@ class Ant:
                 'location': location,
                 'features': np.array(action_features, dtype=np.float32)
             })
-        # Add 'explore' as an action
-        explore_action = {
-            'type': 'explore',
-            'features': np.zeros(4, dtype=np.float32)
-        }
-        possible_actions.append(explore_action)
+        # Conditionally add 'explore' only if no targets are available
+        if not possible_actions:
+            explore_action = {
+                'type': 'explore',
+                'features': np.zeros(4, dtype=np.float32)
+            }
+            possible_actions.append(explore_action)
         action_index, log_prob = self.agent.select_action(self.id, state, possible_actions)
         self.prev_state = state
         self.prev_action = action_index
