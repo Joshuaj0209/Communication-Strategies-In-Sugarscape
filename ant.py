@@ -135,7 +135,7 @@ class Ant:
             'features': np.zeros(4, dtype=np.float32)
         }
         possible_actions.append(explore_action)
-        action_index, log_prob = self.agent.select_action(state, possible_actions)
+        action_index, log_prob = self.agent.select_action(self.id, state, possible_actions)
         self.prev_state = state
         self.prev_action = action_index
         self.prev_log_prob = log_prob
@@ -166,7 +166,7 @@ class Ant:
         # Calculate and store the reward
         self.cumulative_reward = self.calculate_reward()
         # print(f"Reward for ant {self.id} is {self.cumulative_reward} (Interrupted: {interrupted})")
-        self.agent.store_reward(self.cumulative_reward)
+        self.agent.store_reward(self.id,self.cumulative_reward)
         # Also accumulate to total_episode_reward
         self.total_episode_reward += self.cumulative_reward
         self.action_in_progress = False
@@ -469,6 +469,9 @@ class Ant:
         if done:
             if self.action_in_progress:
                 self.end_current_action()
+            else:
+                # Assign a default reward for the last action
+                self.agent.store_reward(self.id, 0)
 
                 self.next_target_selection_time = current_time + self.target_selection_interval
 

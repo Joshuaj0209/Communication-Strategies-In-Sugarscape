@@ -27,11 +27,11 @@ class AntRLAgent:
         self.is_eval = False
         self.policy_net = PolicyNetwork(input_size).to(device)
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=1e-3)
-        self.memory = []
+        self.memory = {}  # Use a dictionary to store experiences per ant
         self.gamma = 0.99
-        self.batch_size = 128
+        # self.batch_size = 100
 
-    def select_action(self, state, possible_actions):
+    def select_action(self, ant_id, state, possible_actions):
         state_tensor = torch.FloatTensor(state).to(device)
         action_logits = []
         for action in possible_actions:
@@ -48,47 +48,81 @@ class AntRLAgent:
             action_distribution = torch.distributions.Categorical(action_probs)
             action_index = action_distribution.sample()
             log_prob = action_distribution.log_prob(action_index)
-            self.memory.append({'log_prob': log_prob, 'reward': None})
+            # Store action in the ant's own memory
+            if ant_id not in self.memory:
+                self.memory[ant_id] = []
+            self.memory[ant_id].append({'log_prob': log_prob, 'reward': None})
+            # print(f"[Debug] Ant {ant_id}: Stored action {action_index} with log_prob {log_prob.item():.4f}")
         return action_index, log_prob
 
-
-    def store_reward(self, reward):
+    def store_reward(self, ant_id, reward):
         if self.is_eval:
             return  # Do not store rewards during evaluation
-        if self.memory and self.memory[-1]['reward'] is None:
-            self.memory[-1]['reward'] = reward
+        if ant_id in self.memory and self.memory[ant_id] and self.memory[ant_id][-1]['reward'] is None:
+            self.memory[ant_id][-1]['reward'] = reward
+            # print(f"[Debug] Ant {ant_id}: Stored reward {reward} for action at index {len(self.memory[ant_id]) - 1}")
+        # else:
+        #     print(f"[Debug] Ant {ant_id}: No action to assign reward to, or the reward is already assigned.")
 
     def update_policy(self):
         if self.is_eval:
             return  # Do not update policy during evaluation
-        if len(self.memory) < self.batch_size:
-            return  # Not enough experiences to perform update
-        # Check that all rewards are available
-        if any(step['reward'] is None for step in self.memory):
-            return  # Wait until all rewards are available
+        
+        # Combine experiences from all ants
+        combined_memory = []
+        for ant_id, ant_memory in self.memory.items():
+            combined_memory.extend(ant_memory)
+        
+        # Proceed only if there are any experiences
+        if not combined_memory:
+            print("[Debug] No experiences to update policy.")
+            return
+            
+        # Filter out steps with no rewards
+        filtered_memory = [step for step in combined_memory if step['reward'] is not None]
+        if not filtered_memory:
+            print("[Debug] No valid experiences with rewards. Skipping update.")
+            return  # If no steps have rewards, skip the update
+
+        print(f"[Debug] Proceeding with {len(filtered_memory)} valid experiences for policy update.")
+        
         # Proceed with policy update
-        memory = self.memory
         R = 0
         returns = []
-        for step in reversed(memory):
+        for step in reversed(filtered_memory):
             R = step['reward'] + self.gamma * R
             returns.insert(0, R)
         returns = torch.tensor(returns).to(device)
+        
         # Normalize returns
         returns = (returns - returns.mean()) / (returns.std() + 1e-9)
+        
         # Compute policy loss
         policy_loss = []
-        for i, step in enumerate(memory):
+        for i, step in enumerate(filtered_memory):
             log_prob = step['log_prob']
-            R = returns[i]
-            policy_loss.append(-log_prob * R)
-        # Perform policy update
-        self.optimizer.zero_grad()
-        policy_loss = torch.cat(policy_loss).sum()
-        policy_loss.backward()
-        self.optimizer.step()
+            if log_prob is not None:
+                R = returns[i]
+                # Make sure log_prob is a 1-dimensional tensor
+                log_prob = log_prob.view(1)
+                policy_loss.append(-log_prob * R)
+        
+        if policy_loss:
+            # Perform policy update
+            self.optimizer.zero_grad()
+            policy_loss = torch.cat(policy_loss).sum()
+            policy_loss.backward()
+            self.optimizer.step()
+            print(f"[Debug] Policy updated. Loss: {policy_loss.item():.4f}")
+        else:
+            print("[Debug] No valid policy loss to update.")
+        
         # Clear memory
-        self.memory = []
+        self.memory = {}
+
+
+
+
 
 
     def save_model(self, file_path):
