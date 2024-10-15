@@ -39,7 +39,7 @@ class AntRLAgent:
             input_tensor = torch.cat([state_tensor, torch.FloatTensor(action_features).to(device)])
             logit = self.policy_net(input_tensor)
             action_logits.append(logit)
-        action_logits = torch.stack(action_logits).squeeze()
+        action_logits = torch.stack(action_logits).squeeze(-1)
         action_probs = torch.softmax(action_logits, dim=0)
         if self.is_eval:
             action_index = torch.argmax(action_probs).item()

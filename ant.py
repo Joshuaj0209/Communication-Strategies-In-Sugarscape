@@ -19,7 +19,7 @@ class Ant:
         self.target = None
          # Use OrderedDict for communicated_targets to maintain order
         self.communicated_targets = collections.OrderedDict()
-        # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count}
+        # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count, 'time_received': timestamp}
 
         self.already_communicated = {}  # Key: other_ant, Value: {location: characteristic}
         self.current_broadcast_characteristic = None  # Track current broadcast characteristic
