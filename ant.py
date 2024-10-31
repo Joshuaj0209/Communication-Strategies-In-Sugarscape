@@ -100,10 +100,10 @@ class Ant:
         self.health_at_action_start = self.health  # Record health at action start
 
         state = self.get_state()
-        N = 10  # Number of communicated targets to consider
+        # N = 10  # Number of communicated targets to consider
         target_items = list(self.communicated_targets.items())
         random.shuffle(target_items)
-        target_items = target_items[:N]
+        # target_items = target_items[:N]
         possible_actions = []
         for location, counts in target_items:
             if location in self.confirmed_false_locations:
@@ -130,12 +130,13 @@ class Ant:
                 'features': np.array(action_features, dtype=np.float32)
             })
         # Conditionally add 'explore' only if no targets are available
-        if not possible_actions:
-            explore_action = {
-                'type': 'explore',
-                'features': np.zeros(4, dtype=np.float32)
-            }
-            possible_actions.append(explore_action)
+        # if not possible_actions:
+        explore_action = {
+            'type': 'explore',
+            'features': np.zeros(4, dtype=np.float32)
+        }
+        possible_actions.append(explore_action)
+        
         action_index, log_prob = self.agent.select_action(self.id, state, possible_actions)
         self.prev_state = state
         self.prev_action = action_index
@@ -252,9 +253,9 @@ class Ant:
                             # Add new location
                             other_ant.communicated_targets[location] = {characteristic: 1}
                             # Ensure communicated_targets remains within size limit
-                            if len(other_ant.communicated_targets) > 10:
-                                # Remove the oldest item
-                                other_ant.communicated_targets.popitem(last=False)
+                            # if len(other_ant.communicated_targets) > 10:
+                            #     # Remove the oldest item
+                            #     other_ant.communicated_targets.popitem(last=False)
                         # Update 'already_communicated'
                         self.already_communicated[other_ant][location] = characteristic
                         
@@ -521,8 +522,7 @@ class Ant:
             health_change = 0  # No health change if health_at_action_start is None
 
         # Base reward can be adjusted as needed
-        base_reward = 0  # No base reward per action unless desired
-
+        base_reward = 0  
         # Total reward is based on health change
         reward = base_reward + health_change
 
