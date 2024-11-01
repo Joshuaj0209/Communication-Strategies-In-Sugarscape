@@ -9,6 +9,7 @@ from rl_agent import AntRLAgent
 import os
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from collections import Counter  # Add this import
 
 def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
@@ -28,14 +29,16 @@ def main(render=True):
     shared_agent = AntRLAgent(input_size)
 
     # Load the trained model
-    trained_model_path = "B_trained_improved_1.pth"  # Replace with your model filename
+    trained_model_path = "F_trained_improved_1.pth"  # Replace with your model filename
     shared_agent.load_model(trained_model_path)
 
-    num_episodes = 500  # Define the number of evaluation episodes
+    num_episodes = 50  # Define the number of evaluation episodes
     episode_length = 30000  # Define the length of each episode in time steps
 
     episode_rewards = []
     episode_lifespans = []  # For tracking average lifespans
+
+    action_characteristics_list = []  # Add this line
 
     for episode in range(num_episodes):
         print(f"Starting Evaluation Episode {episode + 1}/{num_episodes}")
@@ -94,6 +97,11 @@ def main(render=True):
         for ant in sugarscape.all_ants:
             total_rewards.append(ant.total_episode_reward)
 
+        # Collect action characteristics from all ants
+        for ant in sugarscape.all_ants:
+            action_characteristics_list.extend(ant.selected_action_characteristics)
+            ant.selected_action_characteristics = []  # Reset for next episode (optional)
+
         # No policy update during evaluation
 
         # End of episode timing
@@ -127,6 +135,64 @@ def main(render=True):
     print(f"\nOverall Average Reward over {num_episodes} episodes: {total_average_reward:.2f}")
     print(f"Overall Average Lifespan over {num_episodes} episodes: {total_average_lifespan:.2f}")
 
+    # Process action characteristics
+    # Initialize counters
+    characteristic_counts = {
+        'explore': 0,
+        'confirmed': 0,
+        'accepted': 0,
+        'rejected': 0,
+        'distance_bins': Counter(),
+    }
+
+    def get_distance_bin(distance):
+        if distance < 100:
+            return '0-100'
+        elif distance < 200:
+            return '100-200'
+        elif distance < 300:
+            return '200-300'
+        elif distance < 400:
+            return '300-400'
+        else:
+            return '400+'
+
+    # Process action_characteristics_list
+    for action_char in action_characteristics_list:
+        if action_char.get('type') == 'explore':
+            characteristic_counts['explore'] += 1
+        else:
+            # It's a 'target' action
+            predominant_characteristic = action_char['predominant_characteristic']
+            characteristic_counts[predominant_characteristic] += 1
+
+            # Also process distance
+            distance = action_char['distance']
+            distance_bin = get_distance_bin(distance)
+            characteristic_counts['distance_bins'][distance_bin] += 1
+
+    # Plot the bar graph for action types
+    action_types = ['explore', 'confirmed', 'accepted', 'rejected']
+    counts = [characteristic_counts.get(atype, 0) for atype in action_types]
+
+    plt.figure(figsize=(8,6))
+    plt.bar(action_types, counts, color='skyblue')
+    plt.xlabel('Action Type')
+    plt.ylabel('Number of Actions')
+    plt.title('Number of Actions by Type')
+    plt.show()
+
+    # Plot the histogram for distances
+    distance_bins = ['0-100', '100-200', '200-300', '300-400', '400+']
+    distance_counts = [characteristic_counts['distance_bins'].get(bin_label, 0) for bin_label in distance_bins]
+
+    plt.figure(figsize=(8,6))
+    plt.bar(distance_bins, distance_counts, color='salmon')
+    plt.xlabel('Distance Bin')
+    plt.ylabel('Number of Actions')
+    plt.title('Number of Actions by Distance')
+    plt.show()
+
     # After evaluation, plot the results
     plt.figure(figsize=(10, 6))
     plt.plot(range(1, num_episodes + 1), episode_rewards, label='Average Reward')
@@ -134,7 +200,7 @@ def main(render=True):
     plt.ylabel('Average Reward')
     plt.title('Average Reward per Evaluation Episode')
     plt.legend()
-    # plt.show()
+    plt.show()
 
     plt.figure(figsize=(10, 6))
     plt.plot(range(1, num_episodes + 1), episode_lifespans, label='Average Lifespan', color='orange')
@@ -142,7 +208,7 @@ def main(render=True):
     plt.ylabel('Average Lifespan')
     plt.title('Average Lifespan per Evaluation Episode')
     plt.legend()
-    # plt.show()
+    plt.show()
 
     if render:
         pygame.quit()

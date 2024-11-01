@@ -71,6 +71,9 @@ class Ant:
         self.health_at_action_start = None  # Initialize to None
 
         self.current_action_type = None
+
+        self.selected_action_characteristics = []  # Used for evaluation
+
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -126,16 +129,35 @@ class Ant:
                 accepted_normalized,
                 rejected_normalized,
             ])
+
+            # **Determine the predominant characteristic**
+            characteristic_counts = {
+                'confirmed': counts.get('confirmed', 0),
+                'accepted': counts.get('accepted', 0),
+                'rejected': counts.get('rejected', 0),
+            }
+            predominant_characteristic = max(characteristic_counts, key=characteristic_counts.get)
+            predominant_count = characteristic_counts[predominant_characteristic]
+
             possible_actions.append({
                 'type': 'target',
                 'location': location,
-                'features': np.array(action_features, dtype=np.float32)
+                'features': np.array(action_features, dtype=np.float32),
+                'characteristics': {
+                    'distance': distance,
+                    'counts': characteristic_counts.copy(),
+                    'predominant_characteristic': predominant_characteristic,
+                    'predominant_count': predominant_count,
+                }   
             })
         # Conditionally add 'explore' only if no targets are available
         # if not possible_actions:
         explore_action = {
             'type': 'explore',
-            'features': np.zeros(4, dtype=np.float32)
+            'features': np.zeros(4, dtype=np.float32),
+            'characteristics': {
+                'type': 'explore'
+            }
         }
         possible_actions.append(explore_action)
 
@@ -146,6 +168,9 @@ class Ant:
         self.cumulative_reward = 0
         self.action_in_progress = True
         selected_action = possible_actions[action_index]
+
+        self.selected_action_characteristics.append(selected_action['characteristics'])
+
         if selected_action['type'] == 'target':
             self.target = selected_action['location']
             self.is_exploring_target = False
