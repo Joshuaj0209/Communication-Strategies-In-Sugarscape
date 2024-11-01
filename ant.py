@@ -69,6 +69,8 @@ class Ant:
         self.total_episode_reward = 0  # Track total reward for the episode
 
         self.health_at_action_start = None  # Initialize to None
+
+        self.current_action_type = None
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -136,7 +138,7 @@ class Ant:
             'features': np.zeros(4, dtype=np.float32)
         }
         possible_actions.append(explore_action)
-        
+
         action_index, log_prob = self.agent.select_action(self.id, state, possible_actions)
         self.prev_state = state
         self.prev_action = action_index
@@ -154,6 +156,10 @@ class Ant:
             self.explore()
             # print(f"Ant {self.id} is exploring as per selected action")
             sugarscape.explore_count += 1
+        
+        self.current_action_type = selected_action['type']
+        # print(f"ant {self.id} selected new action (type: {self.current_action_type})")
+
 
 
 
@@ -167,6 +173,7 @@ class Ant:
     def end_current_action(self, interrupted=False):
         # Calculate and store the reward
         self.cumulative_reward = self.calculate_reward()
+        # print(f"Reward for ant {self.id} is {self.cumulative_reward} (type: {self.current_action_type})")
         # print(f"Reward for ant {self.id} is {self.cumulative_reward} (Interrupted: {interrupted})")
         self.agent.store_reward(self.id,self.cumulative_reward)
         # Also accumulate to total_episode_reward
@@ -269,7 +276,14 @@ class Ant:
 
         sugar_detected, target_changed = self.detect_sugar(sugar_patches)
 
-        if self.action_in_progress and target_changed and not self.has_reached_target and not self.arrived_at_target:
+        #  # End explore action if target selection time has been reached
+        # if (self.action_in_progress and self.current_action_type == 'explore' 
+        #     and current_time >= self.next_target_selection_time):
+        #     self.end_current_action()
+        #     # Schedule the next target selection
+        #     self.next_target_selection_time = current_time + self.target_selection_interval
+
+        if self.action_in_progress and target_changed and not self.has_reached_target and not self.arrived_at_target and self.current_action_type != 'explore':
             # The action has been interrupted due to detecting new sugar
             self.end_current_action(interrupted=True)
             self.next_target_selection_time = current_time + self.target_selection_interval
