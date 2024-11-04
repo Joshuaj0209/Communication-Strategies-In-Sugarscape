@@ -6,6 +6,12 @@ from sugarscape import SugarScape
 import matplotlib.pyplot as plt  # Import for plotting
 from rl_agent import AntRLAgent  # Add this import
 import os  # Import for directory handling
+import numpy as np
+from sklearn.linear_model import LinearRegression
+
+def moving_average(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
 
 def main(render=False):
     if render:
@@ -21,16 +27,21 @@ def main(render=False):
     input_size = state_size + action_feature_size
     shared_agent = AntRLAgent(input_size)
 
-    num_episodes = 1000  # Define the number of training episodes
+    num_episodes = 5000  # Define the number of training episodes
     episode_length = 30000  # Define the length of each episode in time steps
 
     episode_rewards = []
     episode_lifespans = []  # For tracking average lifespans
 
     # Create a 'checkpoints' directory if it doesn't exist
-    checkpoint_dir = "checkpoints"
+    checkpoint_dir = "checkpoints 5 - F - fixed"
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
+
+    # Create a 'checkpoints' directory if it doesn't exist
+    model_checkpoint_dir = "model checkpoints 5 - F - fixed"
+    if not os.path.exists(model_checkpoint_dir):
+        os.makedirs(model_checkpoint_dir)
 
     for episode in range(num_episodes):
         print(f"Starting Episode {episode + 1}/{num_episodes}")
@@ -124,7 +135,18 @@ def main(render=False):
         if (episode + 1) % 100 == 0:
             checkpoint_episode = episode + 1
             plt.figure(figsize=(10, 6))
-            plt.plot(range(1, checkpoint_episode + 1), episode_rewards, label='Average Reward')
+            
+            # Plot the average reward with transparency
+            plt.plot(range(1, checkpoint_episode + 1), episode_rewards, label='Average Reward', alpha=0.6)
+            
+            # Compute and plot the moving average
+            window_size = 50  # You can adjust the window size as needed
+            if len(episode_rewards) >= window_size:
+                moving_avg = moving_average(episode_rewards, window_size)
+                # Adjust the x-axis for the moving average
+                ma_x = range(window_size, checkpoint_episode + 1)
+                plt.plot(ma_x, moving_avg, color='red', label=f'{window_size}-Episode Moving Average')
+            
             plt.xlabel('Episode')
             plt.ylabel('Average Reward')
             plt.title(f'Average Reward per Episode up to Episode {checkpoint_episode}')
@@ -134,8 +156,15 @@ def main(render=False):
             plt.close()
             print(f"Checkpoint saved: {checkpoint_path}")
 
+        # Save the model every 1000 episodes
+        if (episode + 1) % 1000 == 0:
+            model_path = os.path.join(model_checkpoint_dir, f"model_episode_{episode + 1}.pth")
+            shared_agent.save_model(model_path)
+            print(f"Model checkpoint saved: {model_path}")
+
+
     # After training, save the trained agent
-    shared_agent.save_model("trained_agent.pth")
+    shared_agent.save_model("B_trained_improved_2.pth")
     print("Trained agent saved as 'trained_agent.pth'.")
 
     # Plot the final rewards
@@ -161,6 +190,43 @@ def main(render=False):
     plt.savefig(lifespan_plot)
     plt.show()
     print(f"Final lifespan plot saved: {lifespan_plot}")
+
+    # **Create Scatter Plot: Average Lifespan vs Average Reward**
+    plt.figure(figsize=(10, 6))
+    plt.scatter(episode_rewards, episode_lifespans, alpha=0.6, edgecolors='w', s=100)
+    plt.xlabel('Average Reward')
+    plt.ylabel('Average Lifespan')
+    plt.title('Average Lifespan vs Average Reward per Episode')
+    plt.grid(True)
+    scatter_plot_path = os.path.join(checkpoint_dir, 'average_lifespan_vs_average_reward.png')
+    plt.savefig(scatter_plot_path)
+    plt.show()
+    print(f"Scatter plot saved: {scatter_plot_path}")
+
+     # Optional: Plot a trend line (e.g., linear regression) on the scatter plot
+    if len(episode_rewards) > 1:
+        # Compute linear regression
+        X = np.array(episode_rewards).reshape(-1, 1)
+        y = np.array(episode_lifespans)
+        reg = LinearRegression().fit(X, y)
+        slope = reg.coef_[0]
+        intercept = reg.intercept_
+        print(f"Linear Regression Model: Lifespan = {slope:.4f} * Reward + {intercept:.4f}")
+
+        trendline = reg.predict(X)
+
+        plt.figure(figsize=(10, 6))
+        plt.scatter(episode_rewards, episode_lifespans, alpha=0.6, edgecolors='w', s=100, label='Data Points')
+        plt.plot(episode_rewards, trendline, color='red', label='Trend Line')
+        plt.xlabel('Average Reward')
+        plt.ylabel('Average Lifespan')
+        plt.title('Average Lifespan vs Average Reward per Episode with Trend Line')
+        plt.legend()
+        plt.grid(True)
+        scatter_trend_plot_path = os.path.join(checkpoint_dir, 'average_lifespan_vs_average_reward_trend.png')
+        plt.savefig(scatter_trend_plot_path)
+        plt.show()
+        print(f"Scatter plot with trend line saved: {scatter_trend_plot_path}")
 
     if render:
         pygame.quit()
