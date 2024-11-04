@@ -333,15 +333,15 @@ class Ant:
                 self.current_broadcast_characteristic = 'accepted'
 
             # If the characteristic or location has changed, reset communication tracking
-            if (self.current_broadcast_characteristic != previous_characteristic or
-                    location != previous_location):
-                for other_ant in list(self.already_communicated.keys()):
-                    if location in self.already_communicated[other_ant]:
-                        # Remove the entry for this location
-                        del self.already_communicated[other_ant][location]
-                        # If the inner dictionary is now empty, remove the entry for this other_ant
-                        if not self.already_communicated[other_ant]:
-                            del self.already_communicated[other_ant]
+            # if (self.current_broadcast_characteristic != previous_characteristic or
+            #         location != previous_location):
+            #     for other_ant in list(self.already_communicated.keys()):
+            #         if location in self.already_communicated[other_ant]:
+            #             # Remove the entry for this location
+            #             del self.already_communicated[other_ant][location]
+            #             # If the inner dictionary is now empty, remove the entry for this other_ant
+            #             if not self.already_communicated[other_ant]:
+            #                 del self.already_communicated[other_ant]
 
 
             self.broadcast_sugar_location(self.current_broadcast_characteristic)
@@ -483,19 +483,19 @@ class Ant:
         self.lifespan += 1
 
         # If the target has changed, reset communication tracking
-        if self.target != previous_target:
-            if previous_target:
-                other_ants_to_remove = []
-                for other_ant in list(self.already_communicated.keys()):
-                    # If previous_target is in the inner dictionary for this other_ant
-                    if previous_target in self.already_communicated[other_ant]:
-                        del self.already_communicated[other_ant][previous_target]
-                        # If the inner dictionary is now empty, mark this other_ant for removal
-                        if not self.already_communicated[other_ant]:
-                            other_ants_to_remove.append(other_ant)
-                # Remove other_ants with empty dictionaries
-                for other_ant in other_ants_to_remove:
-                    del self.already_communicated[other_ant]
+        # if self.target != previous_target:
+        #     if previous_target:
+        #         other_ants_to_remove = []
+        #         for other_ant in list(self.already_communicated.keys()):
+        #             # If previous_target is in the inner dictionary for this other_ant
+        #             if previous_target in self.already_communicated[other_ant]:
+        #                 del self.already_communicated[other_ant][previous_target]
+        #                 # If the inner dictionary is now empty, mark this other_ant for removal
+        #                 if not self.already_communicated[other_ant]:
+        #                     other_ants_to_remove.append(other_ant)
+        #         # Remove other_ants with empty dictionaries
+        #         for other_ant in other_ants_to_remove:
+        #             del self.already_communicated[other_ant]
             # Do not reset current_broadcast_characteristic here, since we continue broadcasting after reaching the target
         
         # # Calculate and accumulate the reward
