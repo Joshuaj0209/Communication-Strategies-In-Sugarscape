@@ -73,7 +73,6 @@ class Ant:
         self.current_action_type = None
 
         self.selected_action_characteristics = []  # Used for evaluation
-
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -139,6 +138,8 @@ class Ant:
             predominant_characteristic = max(characteristic_counts, key=characteristic_counts.get)
             predominant_count = characteristic_counts[predominant_characteristic]
 
+            is_false_location = location in self.sugarscape.historical_false_locations
+
             possible_actions.append({
                 'type': 'target',
                 'location': location,
@@ -148,6 +149,7 @@ class Ant:
                     'counts': characteristic_counts.copy(),
                     'predominant_characteristic': predominant_characteristic,
                     'predominant_count': predominant_count,
+                    'is_false_location': is_false_location,  # Add this line
                 }   
             })
         # Conditionally add 'explore' only if no targets are available
@@ -156,7 +158,8 @@ class Ant:
             'type': 'explore',
             'features': np.zeros(4, dtype=np.float32),
             'characteristics': {
-                'type': 'explore'
+                'type': 'explore',
+                'is_false_location': None, 
             }
         }
         possible_actions.append(explore_action)
@@ -301,13 +304,6 @@ class Ant:
 
         sugar_detected, target_changed = self.detect_sugar(sugar_patches)
 
-        #  # End explore action if target selection time has been reached
-        # if (self.action_in_progress and self.current_action_type == 'explore' 
-        #     and current_time >= self.next_target_selection_time):
-        #     self.end_current_action()
-        #     # Schedule the next target selection
-        #     self.next_target_selection_time = current_time + self.target_selection_interval
-
         if self.action_in_progress and target_changed and not self.has_reached_target and not self.arrived_at_target and self.current_action_type != 'explore':
             # The action has been interrupted due to detecting new sugar
             self.end_current_action(interrupted=True)
@@ -332,18 +328,6 @@ class Ant:
             else:
                 self.current_broadcast_characteristic = 'accepted'
 
-            # If the characteristic or location has changed, reset communication tracking
-            # if (self.current_broadcast_characteristic != previous_characteristic or
-            #         location != previous_location):
-            #     for other_ant in list(self.already_communicated.keys()):
-            #         if location in self.already_communicated[other_ant]:
-            #             # Remove the entry for this location
-            #             del self.already_communicated[other_ant][location]
-            #             # If the inner dictionary is now empty, remove the entry for this other_ant
-            #             if not self.already_communicated[other_ant]:
-            #                 del self.already_communicated[other_ant]
-
-
             self.broadcast_sugar_location(self.current_broadcast_characteristic)
         else:
             # If the ant has no target or last location, reset the current broadcast characteristic
@@ -359,6 +343,7 @@ class Ant:
                     random.randint(padding, HEIGHT - padding),
                 )
                 self.sugarscape.broadcast_times[self] = current_time +  800  # Schedule next change in 6 seconds
+
             else:
                 if current_time >= self.sugarscape.broadcast_times[self]:
                     # Reset communication for the old false location
@@ -385,16 +370,6 @@ class Ant:
                     sugarscape.explore_count += 1
                 self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
                 self.next_target_selection_time = current_time + self.target_selection_interval
-        
-        #  # After all possible changes to self.target, check if it has changed
-        # if self.action_in_progress and self.target != previous_target and not self.has_reached_target:
-        #     # The action has been interrupted
-        #     self.agent.store_reward(self.cumulative_reward)
-        #     self.action_in_progress = False
-        #     self.cumulative_reward = 0
-
-        #     print(f"Target changed. Previous target: {previous_target}, Current target: {self.target}")
-        #     self.next_target_selection_time = current_time + self.target_selection_interval
 
 
         if self.target:
@@ -481,30 +456,7 @@ class Ant:
 
         self.health -= HEALTH_DECREASE_RATE
         self.lifespan += 1
-
-        # If the target has changed, reset communication tracking
-        # if self.target != previous_target:
-        #     if previous_target:
-        #         other_ants_to_remove = []
-        #         for other_ant in list(self.already_communicated.keys()):
-        #             # If previous_target is in the inner dictionary for this other_ant
-        #             if previous_target in self.already_communicated[other_ant]:
-        #                 del self.already_communicated[other_ant][previous_target]
-        #                 # If the inner dictionary is now empty, mark this other_ant for removal
-        #                 if not self.already_communicated[other_ant]:
-        #                     other_ants_to_remove.append(other_ant)
-        #         # Remove other_ants with empty dictionaries
-        #         for other_ant in other_ants_to_remove:
-        #             del self.already_communicated[other_ant]
-            # Do not reset current_broadcast_characteristic here, since we continue broadcasting after reaching the target
-        
-        # # Calculate and accumulate the reward
-        # reward = self.calculate_reward()
-        # if self.action_in_progress:
-        #     self.cumulative_reward += reward
-
-
-        
+          
         # Check if the ant is dead
         done = not self.is_alive()
         if done:
