@@ -8,7 +8,7 @@ import numpy as np
 class Ant:
     def __init__(self, x, y, agent, ant_id):
         self.id = ant_id  # Unique identifier for the ant
-
+        self.current_time = 0
         self.x = x
         self.y = y
         self.direction = random.uniform(0, 2 * math.pi)
@@ -19,7 +19,7 @@ class Ant:
         self.target = None
          # Use OrderedDict for communicated_targets to maintain order
         self.communicated_targets = collections.OrderedDict()
-        # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count, 'time_received': timestamp}
+        # Key: (x, y), Value: {'accepted': count, 'rejected': count, 'confirmed': count, 'time_received': sim_time}
 
         self.already_communicated = {}  # Key: other_ant, Value: {location: characteristic}
         self.current_broadcast_characteristic = None  # Track current broadcast characteristic
@@ -73,6 +73,10 @@ class Ant:
         self.current_action_type = None
 
         self.selected_action_characteristics = []  # Used for evaluation
+        self.action_start_time = 0
+
+        self.start_x = x
+        self.start_y = y
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -99,9 +103,10 @@ class Ant:
 
         return False, False
 
-    def select_new_target(self, sugarscape):
+    def select_new_target(self, sugarscape, sim_time):
         self.has_reached_target = False
         self.health_at_action_start = self.health  # Record health at action start
+        self.action_start_time = sim_time  # Record action start time
 
         state = self.get_state()
         # N = 10  # Number of communicated targets to consider
@@ -119,6 +124,12 @@ class Ant:
             max_distance = math.hypot(GAME_WIDTH, HEIGHT)
             distance_normalized = distance / max_distance
             max_count = 10
+            # Calculate time difference and apply exponential decay
+            time_received = counts.get('time_received', sim_time)
+            time_difference = sim_time - time_received
+            decay_rate = 0.001  # Adjust as needed
+            time_normalized = math.exp(-decay_rate * time_difference)
+
             confirmed_normalized = counts.get('confirmed', 0) / max_count
             accepted_normalized = counts.get('accepted', 0) / max_count
             rejected_normalized = counts.get('rejected', 0) / max_count
@@ -127,6 +138,7 @@ class Ant:
                 confirmed_normalized,
                 accepted_normalized,
                 rejected_normalized,
+                time_normalized,
             ])
 
             # **Determine the predominant characteristic**
@@ -156,7 +168,7 @@ class Ant:
         # if not possible_actions:
         explore_action = {
             'type': 'explore',
-            'features': np.zeros(4, dtype=np.float32),
+            'features': np.zeros(5, dtype=np.float32),
             'characteristics': {
                 'type': 'explore',
                 'is_false_location': None, 
@@ -186,10 +198,9 @@ class Ant:
             sugarscape.explore_count += 1
         
         self.current_action_type = selected_action['type']
+        self.start_x = self.x
+        self.start_y = self.y
         # print(f"ant {self.id} selected new action (type: {self.current_action_type})")
-
-
-
 
     def explore(self):
         # Exploration logic: move randomly within the environment
@@ -198,7 +209,9 @@ class Ant:
 
         self.is_exploring_target = True  # Mark this target as an exploration target
 
-    def end_current_action(self, interrupted=False):
+    def end_current_action(self, sim_time, interrupted=False):
+        action_duration = sim_time - self.action_start_time
+        self.action_duration = action_duration  # Store for reward calculation
         # Calculate and store the reward
         self.cumulative_reward = self.calculate_reward()
         # print(f"Reward for ant {self.id} is {self.cumulative_reward} (type: {self.current_action_type})")
@@ -230,6 +243,9 @@ class Ant:
 
 
     def broadcast_sugar_location(self, characteristic, false_location=False):
+        # if characteristic=='confirmed':
+        #     print(self.id, " is confirming location ", self.target_patch_center )
+        
         if false_location:
             if self.false_broadcast_location:
                 broadcast_x, broadcast_y = self.false_broadcast_location
@@ -286,7 +302,7 @@ class Ant:
                             other_ant.communicated_targets.move_to_end(location)
                         else:
                             # Add new location
-                            other_ant.communicated_targets[location] = {characteristic: 1}
+                            other_ant.communicated_targets[location] = {characteristic: 1, 'time_received': self.current_time}
                             # Ensure communicated_targets remains within size limit
                             # if len(other_ant.communicated_targets) > 10:
                             #     # Remove the oldest item
@@ -297,17 +313,21 @@ class Ant:
 
     
     def move(self, sugar_patches, sugarscape, sim_time):
-        current_time = sim_time
+        self.current_time = sim_time
 
         # Store the previous target before detecting sugar
         previous_target = self.target
 
-        sugar_detected, target_changed = self.detect_sugar(sugar_patches)
+        # Detect sugar only if not in action or if the action is 'explore'
+        if not self.action_in_progress or self.is_exploring_target:
+            sugar_detected, target_changed = self.detect_sugar(sugar_patches)
+        else:
+            sugar_detected, target_changed = False, False
 
         if self.action_in_progress and target_changed and not self.has_reached_target and not self.arrived_at_target and self.current_action_type != 'explore':
             # The action has been interrupted due to detecting new sugar
-            self.end_current_action(interrupted=True)
-            self.next_target_selection_time = current_time + self.target_selection_interval
+            self.end_current_action(sim_time, interrupted=True)
+            self.next_target_selection_time = self.current_time + self.target_selection_interval
 
 
         # Store the previous broadcast characteristic and location
@@ -336,16 +356,44 @@ class Ant:
         # False broadcasters continuously broadcast their false location
         if self in self.sugarscape.false_broadcasters:
             if self.false_broadcast_location is None:
-                # Generate a new false location
+                 # Generate a new false location that is at least MIN_FALSE_LOCATION_DISTANCE away from any sugar patch
                 padding = 30
-                self.false_broadcast_location = (
-                    random.randint(padding, GAME_WIDTH - padding),
-                    random.randint(padding, HEIGHT - padding),
-                )
-                self.sugarscape.broadcast_times[self] = current_time +  800  # Schedule next change in 6 seconds
+                max_attempts = 100  # Maximum number of attempts to find a valid location
+                attempts = 0
+                valid_location_found = False
+
+                while not valid_location_found and attempts < max_attempts:
+                    # Generate a random location within the game area with padding
+                    candidate_location = (
+                        random.randint(padding, GAME_WIDTH - padding),
+                        random.randint(padding, HEIGHT - padding),
+                    )
+                    valid_location = True
+                    # Check distance to all sugar patches
+                    for sugar in self.sugarscape.sugar_patches:
+                        dx = sugar['x'] - candidate_location[0]
+                        dy = sugar['y'] - candidate_location[1]
+                        distance = math.hypot(dx, dy)
+                        if distance < 150:   # Minimum distance away from any sugar patch
+                            valid_location = False
+                            break  # No need to check other sugar patches
+
+                    if valid_location:
+                        valid_location_found = True
+                        self.false_broadcast_location = candidate_location
+                        self.sugarscape.broadcast_times[self] = self.current_time + 800  # Schedule next change
+                    else:
+                        attempts += 1
+
+                if not valid_location_found:
+                    # Optional: Handle the case where a valid location wasn't found
+                    print(f"Ant {self.id}: Could not find a valid false location after {max_attempts} attempts.")
+                    # Decide whether to skip generating a false location or relax the distance requirement
+                    # For now, we'll skip this cycle
+                    pass
 
             else:
-                if current_time >= self.sugarscape.broadcast_times[self]:
+                if self.current_time >= self.sugarscape.broadcast_times[self]:
                     # Reset communication for the old false location
                     for other_ant in list(self.already_communicated.keys()):
                         if self.false_broadcast_location in self.already_communicated[other_ant]:
@@ -361,15 +409,15 @@ class Ant:
 
         # Movement logic that might change self.target
         if not sugar_detected and not self.target and self.needs_to_eat() and not self.action_in_progress:
-            if current_time >= self.next_target_selection_time:
+            if self.current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
-                    self.select_new_target(sugarscape)
+                    self.select_new_target(sugarscape, sim_time)
                 else:
                     # No viable targets; explore
                     self.explore()
                     sugarscape.explore_count += 1
                 self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
-                self.next_target_selection_time = current_time + self.target_selection_interval
+                self.next_target_selection_time = self.current_time + self.target_selection_interval
 
 
         if self.target:
@@ -415,8 +463,23 @@ class Ant:
                 # Set has_reached_target to prevent repeated rewards
                 self.has_reached_target = True
                 self.last_location = self.target
-                self.target = None  # Clear the target after reaching it
-                self.is_exploring_target = None  # Reset the flag
+
+                # **Modified Logic:**
+                if found_sugar:
+                    if self.health >= self.initial_health or sugar['count'] <= 0:
+                        # Ant's health is replenished or sugar is depleted
+                        self.target = None
+                        self.is_exploring_target = None
+                        self.has_reached_target = False  # Reset for the next action
+                    else:
+                        # Ant needs to keep consuming sugar, so stay at the location
+                        self.target = (self.x, self.y)
+                        # Continue to consume sugar in subsequent moves
+                else:
+                    # No sugar found at the location, so move on
+                    self.target = None
+                    self.is_exploring_target = None
+                    self.has_reached_target = False  # Reset for the next action
 
                 # Start the arrival timer
                 if not self.arrived_at_target:
@@ -445,9 +508,9 @@ class Ant:
 
                 # End the action after the reward accumulation window is over
                 if self.action_in_progress:
-                    self.end_current_action()
+                    self.end_current_action(sim_time)
 
-                    self.next_target_selection_time = current_time + self.target_selection_interval
+                    self.next_target_selection_time = self.current_time + self.target_selection_interval
 
         self.x += ANT_SPEED * math.cos(self.direction)
         self.y += ANT_SPEED * math.sin(self.direction)
@@ -458,15 +521,15 @@ class Ant:
         self.lifespan += 1
           
         # Check if the ant is dead
-        done = not self.is_alive()
-        if done:
-            if self.action_in_progress:
-                self.end_current_action()
-            else:
-                # Assign a default reward for the last action
-                self.agent.store_reward(self.id, 0)
+        # done = not self.is_alive()
+        # if done:
+        #     if self.action_in_progress:
+        #         self.end_current_action()
+        #     else:
+        #         # Assign a default reward for the last action
+        #         self.agent.store_reward(self.id, 0)
 
-                self.next_target_selection_time = current_time + self.target_selection_interval
+        #         self.next_target_selection_time = current_time + self.target_selection_interval
 
     def needs_to_eat(self):
         return self.health < self.initial_health
@@ -513,16 +576,34 @@ class Ant:
             health_change = 0  # No health change if health_at_action_start is None
 
         # Base reward can be adjusted as needed
-        base_reward = 0  
-        # Total reward is based on health change
-        reward = base_reward + health_change
+        base_reward = 0
 
-        # Optionally, you can add penalties or bonuses based on other factors
-        # For example, penalize time taken if you wish
-        # time_penalty = - (self.lifespan - self.action_start_time)
-        # reward += time_penalty
+        # Time penalty based on action duration
+        if hasattr(self, 'action_duration'):
+            time_penalty = -self.action_duration * 0.04  # Adjust as needed
+        else:
+            time_penalty = 0
 
-        return reward
+        # Total reward before distance adjustment
+        total_reward = base_reward + health_change  # + time_penalty
 
+        # Calculate distance traveled
+        dx = self.x - self.start_x
+        dy = self.y - self.start_y
+        distance_traveled = math.hypot(dx, dy)
 
+        # Normalize the distance
+        max_distance = math.hypot(GAME_WIDTH, HEIGHT)
+        distance_normalized = distance_traveled / max_distance
 
+        # Adjust reward based on sign using normalized distance
+        if total_reward > 0:
+            # For positive rewards, decrease reward with distance
+            adjusted_reward = total_reward * (1 - distance_normalized)
+        elif total_reward < 0:
+            # For negative rewards, increase penalty with distance
+            adjusted_reward = total_reward * (1 + distance_normalized)
+        else:
+            adjusted_reward = 0  # No adjustment needed for zero reward
+
+        return adjusted_reward

@@ -63,6 +63,9 @@ class BaselineAnt:
 
         self.selected_action_characteristics = []  # Used for evaluation
 
+        self.action_in_progress = False
+
+
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
         closest_distance = float('inf')
@@ -91,6 +94,20 @@ class BaselineAnt:
     def select_new_target(self, sugarscape):
         self.has_reached_target = False
         self.health_at_action_start = self.health  # Record health at action start
+        # health_threshold = 0.9  # 90% of max health
+
+        # if self.health / self.initial_health > health_threshold:
+        #     # Decide to explore
+        #     # print("exploring due to health")
+        #     self.explore()
+        #     sugarscape.explore_count += 1
+        #     self.current_action_type = 'explore'
+        #     # For evaluation, record the explore action
+        #     self.selected_action_characteristics.append({
+        #         'type': 'explore',
+        #         'is_false_location': None,
+        #     })
+        #     return
 
         max_distance = math.hypot(GAME_WIDTH, HEIGHT)
         viable_targets = []
@@ -116,7 +133,7 @@ class BaselineAnt:
                 rejected = counts.get('rejected', 0)
 
                 # Calculate score based on the rule-based function
-                score = (confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)
+                score = (confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)  ## 
                 viable_targets.append((location, score))
 
                 # Collect action characteristics for evaluation
@@ -139,7 +156,7 @@ class BaselineAnt:
                     'is_false_location': is_false_location,
                 })
                 total_weight += score
-
+        
         if viable_targets:
             # Select a target based on weighted probabilities
             rand_value = random.uniform(0, total_weight)
@@ -156,11 +173,11 @@ class BaselineAnt:
                     selected_idx = idx  # Save index to retrieve action characteristics
 
                     # Check if the accepted location is true or false
-                    if location in [(patch['x'], patch['y']) for patch in sugarscape.sugar_patches if patch['count'] > 0]:
+                    if location in [(patch['x'], patch['y']) for patch in sugarscape.sugar_patches]:
                         sugarscape.true_positives += 1
                     elif location in sugarscape.historical_false_locations:
-                        sugarscape.false_positives += 1
-
+                        # sugarscape.false_positives += 1
+                        continue
                     break
 
             # Append the action characteristics of the selected target
@@ -177,6 +194,8 @@ class BaselineAnt:
                 'type': 'explore',
                 'is_false_location': None,
             })
+
+        self.action_in_progress = True
 
 
     def explore(self):
@@ -251,7 +270,11 @@ class BaselineAnt:
         # Store the previous target before detecting sugar
         previous_target = self.target
 
-        sugar_detected, target_changed = self.detect_sugar(sugar_patches)
+        # Detect sugar only if not in action or if the action is 'explore'
+        if not self.action_in_progress or self.is_exploring_target:
+            sugar_detected, target_changed = self.detect_sugar(sugar_patches)
+        else:
+            sugar_detected, target_changed = False, False
 
         # Store the previous broadcast characteristic and location
         previous_characteristic = self.current_broadcast_characteristic
@@ -355,6 +378,7 @@ class BaselineAnt:
                 self.last_location = self.target
                 self.target = None  # Clear the target after reaching it
                 self.is_exploring_target = None  # Reset the flag
+                self.action_in_progress = False 
 
                 # Start the arrival timer
                 if not self.arrived_at_target:

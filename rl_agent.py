@@ -13,12 +13,14 @@ class PolicyNetwork(nn.Module):
         super(PolicyNetwork, self).__init__()
         self.fc1 = nn.Linear(input_size, 128)
         self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 1)  # Output a scalar logit
+        # self.fc3 = nn.Linear(128, 128)
+        self.fc4 = nn.Linear(128, 1)  # Output a scalar logit
         
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        logit = self.fc3(x)
+        # x = torch.relu(self.fc3(x))
+        logit = self.fc4(x)
         return logit
 
 
@@ -26,9 +28,9 @@ class AntRLAgent:
     def __init__(self, input_size):
         self.is_eval = False
         self.policy_net = PolicyNetwork(input_size).to(device)
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=1e-3)
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=1e-4)
         self.memory = {}  # Use a dictionary to store experiences per ant
-        self.gamma = 0.99
+        self.gamma = 0.90
         # self.batch_size = 100
 
     def select_action(self, ant_id, state, possible_actions):
@@ -42,7 +44,8 @@ class AntRLAgent:
         action_logits = torch.stack(action_logits).squeeze(-1)
         action_probs = torch.softmax(action_logits, dim=0)
         if self.is_eval:
-            action_index = torch.argmax(action_probs).item()
+            # Select the action with the highest logit (expected value)
+            action_index = torch.argmax(action_logits).item()
             log_prob = None
         else:
             action_distribution = torch.distributions.Categorical(action_probs)
@@ -62,7 +65,7 @@ class AntRLAgent:
             self.memory[ant_id][-1]['reward'] = reward
             # print(f"[Debug] Ant {ant_id}: Stored reward {reward} for action at index {len(self.memory[ant_id]) - 1}")
         # else:
-        #     print(f"[Debug] Ant {ant_id}: No action to assign reward to, or the reward is already assigned.")
+            # print(f"[Debug] Ant {ant_id}: No action to assign reward to, or the reward is already assigned.")
 
     def update_policy(self):
         if self.is_eval:
@@ -119,11 +122,6 @@ class AntRLAgent:
         
         # Clear memory
         self.memory = {}
-
-
-
-
-
 
     def save_model(self, file_path):
         torch.save(self.policy_net.state_dict(), file_path)

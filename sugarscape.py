@@ -3,9 +3,10 @@ import pygame
 import math
 from constants import *
 from ant import Ant
+# from BaselineAnt import BaselineAnt
 
 class SugarScape:
-    def __init__(self, shared_agent):
+    def __init__(self, shared_agent=None):
         padding = 120  # Padding from the edges
         patch_size = int(math.sqrt(SUGAR_MAX)) * SQUARE_SIZE  # Size of the entire sugar patch
 
@@ -17,6 +18,8 @@ class SugarScape:
 
         # Initialize ants
         self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), shared_agent, ant_id=i) for i in range(NUM_ANTS)]
+        # self.ants = [BaselineAnt(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), ant_id=i) for i in range(NUM_ANTS)]
+
         self.all_ants = self.ants.copy()  # Keep a copy of all ants
 
         self.sugar_patches = self.initialize_sugar_patches()
@@ -87,21 +90,33 @@ class SugarScape:
 
     def add_new_sugar_patch(self):
         max_attempts = 100
-        min_distance = 180
+        min_distance_sugar = 180  # Minimum distance from existing sugar patches
+        min_distance_false = 150  # Minimum distance from historical false locations
         padding = 20
 
         for attempt in range(max_attempts):
             x = random.randint(padding + SUGAR_PATCH_RADIUS, GAME_WIDTH - padding - SUGAR_PATCH_RADIUS)
             y = random.randint(padding + SUGAR_PATCH_RADIUS, HEIGHT - padding - SUGAR_PATCH_RADIUS)
 
-            too_close = any(
-                math.hypot(x - sugar['x'], y - sugar['y']) < min_distance for sugar in self.sugar_patches
+            # Check distance from existing sugar patches
+            too_close_sugar = any(
+                math.hypot(x - sugar['x'], y - sugar['y']) < min_distance_sugar for sugar in self.sugar_patches
             )
 
-            if not too_close:
+            # Check distance from historical false locations
+            too_close_false = any(
+                math.hypot(x - false_loc[0], y - false_loc[1]) < min_distance_false for false_loc in self.historical_false_locations
+            )
+
+            if not too_close_sugar and not too_close_false:
                 patch = {'x': x, 'y': y, 'count': 70, 'radius': SUGAR_PATCH_RADIUS}
                 self.sugar_patches.append(patch)
+                print(f"New sugar patch added at ({x}, {y}) on attempt {attempt + 1}.")
                 break
+        else:
+            # Handle the case where a valid location wasn't found after max_attempts
+            print(f"Failed to add a new sugar patch after {max_attempts} attempts.")
+
 
 
 
