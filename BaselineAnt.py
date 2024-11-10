@@ -7,9 +7,10 @@ import numpy as np
 from constants import *
 
 class BaselineAnt:
-    def __init__(self, x, y, ant_id):
+    def __init__(self, x, y, ant_id, is_false_broadcaster=False):
         self.id = ant_id  # Unique identifier for the ant
-
+        self.current_time = 0
+        self.is_false_broadcaster = is_false_broadcaster
         self.x = x
         self.y = y
         self.direction = random.uniform(0, 2 * math.pi)
@@ -66,6 +67,7 @@ class BaselineAnt:
         self.action_in_progress = False
 
 
+
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
         closest_distance = float('inf')
@@ -92,110 +94,110 @@ class BaselineAnt:
         return False, False
 
     def select_new_target(self, sugarscape):
-        self.has_reached_target = False
-        self.health_at_action_start = self.health  # Record health at action start
-        # health_threshold = 0.9  # 90% of max health
+            self.has_reached_target = False
+            self.health_at_action_start = self.health  # Record health at action start
+            # health_threshold = 0.9  # 90% of max health
 
-        # if self.health / self.initial_health > health_threshold:
-        #     # Decide to explore
-        #     # print("exploring due to health")
-        #     self.explore()
-        #     sugarscape.explore_count += 1
-        #     self.current_action_type = 'explore'
-        #     # For evaluation, record the explore action
-        #     self.selected_action_characteristics.append({
-        #         'type': 'explore',
-        #         'is_false_location': None,
-        #     })
-        #     return
+            # if self.health / self.initial_health > health_threshold:
+            #     # Decide to explore
+            #     # print("exploring due to health")
+            #     self.explore()
+            #     sugarscape.explore_count += 1
+            #     self.current_action_type = 'explore'
+            #     # For evaluation, record the explore action
+            #     self.selected_action_characteristics.append({
+            #         'type': 'explore',
+            #         'is_false_location': None,
+            #     })
+            #     return
 
-        max_distance = math.hypot(GAME_WIDTH, HEIGHT)
-        viable_targets = []
-        total_weight = 0
-        action_characteristics_list = []
+            max_distance = math.hypot(GAME_WIDTH, HEIGHT)
+            viable_targets = []
+            total_weight = 0
+            action_characteristics_list = []
 
-        for location, counts in self.communicated_targets.items():
-            # Skip locations that are this ant's own false locations
-            if location in self.own_false_locations:
-                continue
+            for location, counts in self.communicated_targets.items():
+                # Skip locations that are this ant's own false locations
+                if location in self.own_false_locations:
+                    continue
 
-            # Skip confirmed locations
-            if location in self.confirmed_false_locations or location in self.confirmed_true_locations:
-                continue
+                # Skip confirmed locations
+                if location in self.confirmed_false_locations or location in self.confirmed_true_locations:
+                    continue
 
-            dx = location[0] - self.x
-            dy = location[1] - self.y
-            distance = math.hypot(dx, dy)
+                dx = location[0] - self.x
+                dy = location[1] - self.y
+                distance = math.hypot(dx, dy)
 
-            if distance <= max_distance:
-                confirmed = counts.get('confirmed', 0)
-                accepted = counts.get('accepted', 0)
-                rejected = counts.get('rejected', 0)
+                if distance <= max_distance:
+                    confirmed = counts.get('confirmed', 0)
+                    accepted = counts.get('accepted', 0)
+                    rejected = counts.get('rejected', 0)
 
-                # Calculate score based on the rule-based function
-                score = (confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)  ## 
-                viable_targets.append((location, score))
+                    # Calculate score based on the rule-based function
+                    score = (2*confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)  ## 
+                    viable_targets.append((location, score))
 
-                # Collect action characteristics for evaluation
-                characteristic_counts = {
-                    'confirmed': confirmed,
-                    'accepted': accepted,
-                    'rejected': rejected,
-                }
-                predominant_characteristic = max(characteristic_counts, key=characteristic_counts.get)
-                predominant_count = characteristic_counts[predominant_characteristic]
-                is_false_location = location in sugarscape.historical_false_locations
+                    # Collect action characteristics for evaluation
+                    characteristic_counts = {
+                        'confirmed': confirmed,
+                        'accepted': accepted,
+                        'rejected': rejected,
+                    }
+                    predominant_characteristic = max(characteristic_counts, key=characteristic_counts.get)
+                    predominant_count = characteristic_counts[predominant_characteristic]
+                    is_false_location = location in sugarscape.historical_false_locations
 
-                action_characteristics_list.append({
-                    'type': 'target',
-                    'location': location,
-                    'distance': distance,
-                    'counts': characteristic_counts.copy(),
-                    'predominant_characteristic': predominant_characteristic,
-                    'predominant_count': predominant_count,
-                    'is_false_location': is_false_location,
+                    action_characteristics_list.append({
+                        'type': 'target',
+                        'location': location,
+                        'distance': distance,
+                        'counts': characteristic_counts.copy(),
+                        'predominant_characteristic': predominant_characteristic,
+                        'predominant_count': predominant_count,
+                        'is_false_location': is_false_location,
+                    })
+                    total_weight += score
+            
+            if viable_targets:
+                # Select a target based on weighted probabilities
+                rand_value = random.uniform(0, total_weight)
+                cumulative_weight = 0
+                selected_idx = None
+                for idx, (location, weight) in enumerate(viable_targets):
+                    cumulative_weight += weight
+                    if rand_value <= cumulative_weight:
+                        self.target = location
+                        sugarscape.exploit_count += 1
+                        self.is_exploring_target = False  # Set to False as it's not an explore target
+                        self.broadcast_sugar_location('accepted')
+
+                        selected_idx = idx  # Save index to retrieve action characteristics
+
+                        # Check if the accepted location is true or false
+                        if location in [(patch['x'], patch['y']) for patch in sugarscape.sugar_patches]:
+                            sugarscape.true_positives += 1
+                        elif location in sugarscape.historical_false_locations:
+                            sugarscape.false_positives += 1
+                        break
+
+                # Append the action characteristics of the selected target
+                if selected_idx is not None:
+                    selected_action_char = action_characteristics_list[selected_idx]
+                    self.selected_action_characteristics.append(selected_action_char)
+            else:
+                # If no viable targets, explore
+                self.explore()
+                sugarscape.explore_count += 1
+                self.current_action_type = 'explore'
+                # For evaluation, record the explore action
+                self.selected_action_characteristics.append({
+                    'type': 'explore',
+                    'is_false_location': None,
                 })
-                total_weight += score
-        
-        if viable_targets:
-            # Select a target based on weighted probabilities
-            rand_value = random.uniform(0, total_weight)
-            cumulative_weight = 0
-            selected_idx = None
-            for idx, (location, weight) in enumerate(viable_targets):
-                cumulative_weight += weight
-                if rand_value <= cumulative_weight:
-                    self.target = location
-                    sugarscape.exploit_count += 1
-                    self.is_exploring_target = False  # Set to False as it's not an explore target
-                    self.broadcast_sugar_location('accepted')
 
-                    selected_idx = idx  # Save index to retrieve action characteristics
+            self.action_in_progress = True
 
-                    # Check if the accepted location is true or false
-                    if location in [(patch['x'], patch['y']) for patch in sugarscape.sugar_patches]:
-                        sugarscape.true_positives += 1
-                    elif location in sugarscape.historical_false_locations:
-                        # sugarscape.false_positives += 1
-                        continue
-                    break
-
-            # Append the action characteristics of the selected target
-            if selected_idx is not None:
-                selected_action_char = action_characteristics_list[selected_idx]
-                self.selected_action_characteristics.append(selected_action_char)
-        else:
-            # If no viable targets, explore
-            self.explore()
-            sugarscape.explore_count += 1
-            self.current_action_type = 'explore'
-            # For evaluation, record the explore action
-            self.selected_action_characteristics.append({
-                'type': 'explore',
-                'is_false_location': None,
-            })
-
-        self.action_in_progress = True
 
 
     def explore(self):
@@ -265,7 +267,7 @@ class BaselineAnt:
                         self.already_communicated[other_ant][location] = characteristic
 
     def move(self, sugar_patches, sugarscape, sim_time):
-        current_time = sim_time
+        self.current_time = sim_time
 
         # Store the previous target before detecting sugar
         previous_target = self.target
@@ -275,6 +277,14 @@ class BaselineAnt:
             sugar_detected, target_changed = self.detect_sugar(sugar_patches)
         else:
             sugar_detected, target_changed = False, False
+
+        if self.action_in_progress and target_changed and not self.has_reached_target and not self.arrived_at_target and self.current_action_type != 'explore':
+            # The action has been interrupted due to detecting new sugar
+            self.next_target_selection_time = self.current_time + self.target_selection_interval
+
+        if self.action_in_progress and self.current_time >= self.next_target_selection_time and self.current_action_type == 'explore' and not self.arrived_at_target:
+            # After ending the action, set the next target selection time
+            self.next_target_selection_time = self.current_time + self.target_selection_interval
 
         # Store the previous broadcast characteristic and location
         previous_characteristic = self.current_broadcast_characteristic
@@ -302,16 +312,43 @@ class BaselineAnt:
         # False broadcasters continuously broadcast their false location
         if self in self.sugarscape.false_broadcasters:
             if self.false_broadcast_location is None:
-                # Generate a new false location
+                 # Generate a new false location that is at least MIN_FALSE_LOCATION_DISTANCE away from any sugar patch
                 padding = 30
-                self.false_broadcast_location = (
-                    random.randint(padding, GAME_WIDTH - padding),
-                    random.randint(padding, HEIGHT - padding),
-                )
-                self.sugarscape.broadcast_times[self] = current_time + 800  # Schedule next change
+                max_attempts = 100  # Maximum number of attempts to find a valid location
+                attempts = 0
+                valid_location_found = False
 
+                while not valid_location_found and attempts < max_attempts:
+                    # Generate a random location within the game area with padding
+                    candidate_location = (
+                        random.randint(padding, GAME_WIDTH - padding),
+                        random.randint(padding, HEIGHT - padding),
+                    )
+                    valid_location = True
+                    # Check distance to all sugar patches
+                    for sugar in self.sugarscape.sugar_patches:
+                        dx = sugar['x'] - candidate_location[0]
+                        dy = sugar['y'] - candidate_location[1]
+                        distance = math.hypot(dx, dy)
+                        if distance < 150:   # Minimum distance away from any sugar patch
+                            valid_location = False
+                            break  # No need to check other sugar patches
+
+                    if valid_location:
+                        valid_location_found = True
+                        self.false_broadcast_location = candidate_location
+                        self.sugarscape.broadcast_times[self] = self.current_time + 800  # NB: change back to 1000
+                    else:
+                        attempts += 1
+
+                if not valid_location_found:
+                    # Optional: Handle the case where a valid location wasn't found
+                    print(f"Ant {self.id}: Could not find a valid false location after {max_attempts} attempts.")
+                    # Decide whether to skip generating a false location or relax the distance requirement
+                    # For now, we'll skip this cycle
+                    pass
             else:
-                if current_time >= self.sugarscape.broadcast_times[self]:
+                if self.current_time >= self.sugarscape.broadcast_times[self]:
                     # Reset communication for the old false location
                     for other_ant in list(self.already_communicated.keys()):
                         if self.false_broadcast_location in self.already_communicated[other_ant]:
@@ -327,7 +364,7 @@ class BaselineAnt:
 
         # Movement logic that might change self.target
         if not sugar_detected and not self.target and self.needs_to_eat():
-            if current_time >= self.next_target_selection_time:
+            if self.current_time >= self.next_target_selection_time:
                 if self.communicated_targets:
                     self.select_new_target(sugarscape)
                 else:
@@ -335,7 +372,7 @@ class BaselineAnt:
                     self.explore()
                     sugarscape.explore_count += 1
                 self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
-                self.next_target_selection_time = current_time + self.target_selection_interval
+                self.next_target_selection_time = self.current_time + self.target_selection_interval
 
         if self.target:
             dx = self.target[0] - self.x
@@ -373,12 +410,22 @@ class BaselineAnt:
                     if not self.is_exploring_target and not self.has_reached_target:
                         pass  # Placeholder for any additional logic
 
-                # Set has_reached_target to prevent repeated actions
-                self.has_reached_target = True
-                self.last_location = self.target
-                self.target = None  # Clear the target after reaching it
-                self.is_exploring_target = None  # Reset the flag
-                self.action_in_progress = False 
+                # **Modified Logic:**
+                if found_sugar:
+                    if self.health >= self.initial_health or sugar['count'] <= 0:
+                        # Ant's health is replenished or sugar is depleted
+                        self.target = None
+                        self.is_exploring_target = None
+                        self.has_reached_target = False  # Reset for the next action
+                    else:
+                        # Ant needs to keep consuming sugar, so stay at the location
+                        self.target = (self.x, self.y)
+                        # Continue to consume sugar in subsequent moves
+                else:
+                    # No sugar found at the location, so move on
+                    self.target = None
+                    self.is_exploring_target = None
+                    self.has_reached_target = False  # Reset for the next action
 
                 # Start the arrival timer
                 if not self.arrived_at_target:
@@ -399,21 +446,21 @@ class BaselineAnt:
             if self.frames_since_arrival >= self.max_arrival_frames:
                 self.arrived_at_target = False  # Reset flag
 
-                # Schedule next target selection
-                self.next_target_selection_time = current_time + self.target_selection_interval
+                if self.action_in_progress:
+                    # Schedule next target selection
+                    self.next_target_selection_time = self.current_time + self.target_selection_interval
 
         self.x += ANT_SPEED * math.cos(self.direction)
         self.y += ANT_SPEED * math.sin(self.direction)
         self.x = max(0, min(self.x, GAME_WIDTH))
         self.y = max(0, min(self.y, HEIGHT))
 
-        self.health -= HEALTH_DECREASE_RATE
+        if self.is_false_broadcaster:
+            self.health -= FALSE_BROADCASTER_HEALTH_DECREASE_RATE
+        else:
+            self.health -= HEALTH_DECREASE_RATE
         self.lifespan += 1
 
-        # Check if the ant is dead
-        if not self.is_alive():
-            # Handle ant death if needed
-            pass
 
     def needs_to_eat(self):
         return self.health < self.initial_health

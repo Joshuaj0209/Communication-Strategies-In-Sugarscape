@@ -3,7 +3,8 @@ import pygame
 import math
 from constants import *
 from ant import Ant
-# from BaselineAnt import BaselineAnt
+import numpy as np
+from BaselineAnt import BaselineAnt
 
 class SugarScape:
     def __init__(self, shared_agent=None):
@@ -17,8 +18,8 @@ class SugarScape:
         ]
 
         # Initialize ants
-        self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), shared_agent, ant_id=i) for i in range(NUM_ANTS)]
-        # self.ants = [BaselineAnt(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), ant_id=i) for i in range(NUM_ANTS)]
+        # self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), shared_agent, ant_id=i) for i in range(NUM_ANTS)]
+        self.ants = [BaselineAnt(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), ant_id=i) for i in range(NUM_ANTS)]
 
         self.all_ants = self.ants.copy()  # Keep a copy of all ants
 
@@ -30,7 +31,11 @@ class SugarScape:
         self.total_lifespan_of_dead_ants = 0
 
         # Choose two false broadcaster ants
-        self.false_broadcasters = random.sample(self.ants, 2)
+        self.false_broadcasters = random.sample(self.ants, 2)  # NB: Change back to 3 if using 25 ants
+         # Set the is_false_broadcaster flag to True for selected ants
+        for ant in self.false_broadcasters:
+            ant.is_false_broadcaster = True
+
         # Initialize broadcast times for each false broadcaster
         self.broadcast_times = {ant: 600 for ant in self.false_broadcasters}
         self.false_broadcasters_locations = set()  # Track false locations
@@ -49,6 +54,10 @@ class SugarScape:
         # Provide each ant with a reference to the Sugarscape instance
         for ant in self.ants:
             ant.sugarscape = self
+
+        self.lifespan_of_dead_ants = []     # List to store lifespans of dead ants
+        self.lifespan_of_alive_ants = []    # List to store lifespans of currently alive ants
+
 
     def initialize_sugar_patches(self):
         patches = []
@@ -76,9 +85,13 @@ class SugarScape:
                 if ant in self.false_broadcasters and ant.false_broadcast_location:
                     self.false_broadcasters_locations.add(ant.false_broadcast_location)
                     self.historical_false_locations.add(ant.false_broadcast_location)  # Track all false locations
+                
+                # self.lifespan_of_alive_ants.append(ant.lifespan)
+
             else:
                 self.dead_ants_count += 1
                 self.total_lifespan_of_dead_ants += ant.lifespan
+                self.lifespan_of_dead_ants.append(ant.lifespan)  # Add to dead lifespans
 
         self.ants = alive_ants
 
@@ -111,11 +124,12 @@ class SugarScape:
             if not too_close_sugar and not too_close_false:
                 patch = {'x': x, 'y': y, 'count': 70, 'radius': SUGAR_PATCH_RADIUS}
                 self.sugar_patches.append(patch)
-                print(f"New sugar patch added at ({x}, {y}) on attempt {attempt + 1}.")
+                # print(f"New sugar patch added at ({x}, {y}) on attempt {attempt + 1}.")
                 break
         else:
             # Handle the case where a valid location wasn't found after max_attempts
-            print(f"Failed to add a new sugar patch after {max_attempts} attempts.")
+            # print(f"Failed to add a new sugar patch after {max_attempts} attempts.")
+            pass
 
 
 
@@ -169,21 +183,46 @@ class SugarScape:
 
 
     def get_analytics_data(self):
-        total_lifespan = self.total_lifespan_of_dead_ants  # Start with total lifespan of dead ants
-        
-        # Add the lifespan (age) of living ants
+        # Collect lifespans of alive ants at the end of the episode
         for ant in self.ants:
-            total_lifespan += ant.lifespan  # Add each living ant's current age
+            self.lifespan_of_alive_ants.append(ant.lifespan)
 
-        total_ants = self.dead_ants_count + len(self.ants)  # Total number of ants, dead + alive
-        average_lifespan = total_lifespan / total_ants if total_ants > 0 else 0  # Calculate average
+        # Combine lifespans of dead and alive ants
+        all_lifespans = self.lifespan_of_dead_ants + self.lifespan_of_alive_ants
 
-        # total_remaining_sugar = sum(sugar['count'] for sugar in self.sugar_patches)
+        if not all_lifespans:
+            average_lifespan = 0
+        else:
+            # Convert to NumPy array for percentile calculations
+            lifespans_array = np.array(all_lifespans)
 
+            # Calculate Q1 and Q3
+            Q1 = np.percentile(lifespans_array, 25)
+            Q3 = np.percentile(lifespans_array, 75)
+            IQR = Q3 - Q1
+
+            # Define bounds for acceptable lifespans
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+
+            # Filter lifespans within the bounds
+            filtered_lifespans = lifespans_array[(lifespans_array >= lower_bound) & (lifespans_array <= upper_bound)]
+
+            if len(filtered_lifespans) == 0:
+                # If all lifespans are outliers, fallback to median
+                average_lifespan = np.median(lifespans_array)
+            else:
+                # Calculate the mean of the filtered lifespans
+                average_lifespan = np.mean(filtered_lifespans)
+
+        # Reset lifespan lists for the next episode
+        self.lifespan_of_dead_ants = []
+        self.lifespan_of_alive_ants = []
+
+        # Tracking statistics
         return {
             'Total Sugar Patches': len(self.sugar_patches),
             'Consumed Sugar': self.consumed_sugar_count,
-            # 'Remaining Sugar': len([s for s in self.sugar_patches if s[2]]),
             'Number of Ants': len(self.ants),
             'Dead Ants': self.dead_ants_count,
             'Average Lifespan': average_lifespan,
@@ -192,4 +231,5 @@ class SugarScape:
             'Exploits': self.exploit_count,
             'Explores': self.explore_count
         }
+
 

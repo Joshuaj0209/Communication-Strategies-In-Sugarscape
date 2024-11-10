@@ -13,13 +13,13 @@ class PolicyNetwork(nn.Module):
         super(PolicyNetwork, self).__init__()
         self.fc1 = nn.Linear(input_size, 128)
         self.fc2 = nn.Linear(128, 128)
-        # self.fc3 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 128)
         self.fc4 = nn.Linear(128, 1)  # Output a scalar logit
         
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        # x = torch.relu(self.fc3(x))
+        x = torch.relu(self.fc3(x))
         logit = self.fc4(x)
         return logit
 
@@ -44,6 +44,8 @@ class AntRLAgent:
         action_logits = torch.stack(action_logits).squeeze(-1)
         action_probs = torch.softmax(action_logits, dim=0)
         if self.is_eval:
+            # print(f"[Debug] Ant {ant_id}: Selecting action during evaluation")
+
             # Select the action with the highest logit (expected value)
             action_index = torch.argmax(action_logits).item()
             log_prob = None
@@ -78,14 +80,19 @@ class AntRLAgent:
         
         # Proceed only if there are any experiences
         if not combined_memory:
-            print("[Debug] No experiences to update policy.")
+            # print("[Debug] No experiences to update policy.")
             return
             
         # Filter out steps with no rewards
         filtered_memory = [step for step in combined_memory if step['reward'] is not None]
         if not filtered_memory:
-            print("[Debug] No valid experiences with rewards. Skipping update.")
+            # print("[Debug] No valid experiences with rewards. Skipping update.")
             return  # If no steps have rewards, skip the update
+        
+        MIN_BATCH_SIZE = 5  # Define a minimum batch size
+        if len(filtered_memory) < MIN_BATCH_SIZE:
+            print(f"[Debug] Not enough experiences to update policy. Need at least {MIN_BATCH_SIZE}.")
+            return  # Wait until we have enough experiences
 
         print(f"[Debug] Proceeding with {len(filtered_memory)} valid experiences for policy update.")
         
@@ -116,7 +123,7 @@ class AntRLAgent:
             policy_loss = torch.cat(policy_loss).sum()
             policy_loss.backward()
             self.optimizer.step()
-            print(f"[Debug] Policy updated. Loss: {policy_loss.item():.4f}")
+            # print(f"[Debug] Policy updated. Loss: {policy_loss.item():.4f}")
         else:
             print("[Debug] No valid policy loss to update.")
         

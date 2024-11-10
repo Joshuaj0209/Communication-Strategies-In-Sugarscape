@@ -28,10 +28,10 @@ def main(render=False):
     episode_lifespans = []  # For tracking average lifespans
 
     # Create necessary directories if they don't exist
-    checkpoint_dir = "checkpoints final - B"
+    checkpoint_dir = "checkpoints 2 hidden - F"
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    model_checkpoint_dir = "model checkpoints final - B"
+    model_checkpoint_dir = "model checkpoints 2 hidden - F"
     os.makedirs(model_checkpoint_dir, exist_ok=True)
 
     action_characteristics_list = []
@@ -40,7 +40,7 @@ def main(render=False):
     training_data = []
 
     # Define CSV file path
-    csv_file = "RL_Training.csv"
+    csv_file = "RL_Training_F_2_hidden.csv"
     csv_columns = ['Episode', 'Average Reward', 'Average Lifespan',
                    'True Location Count', 'False Location Count',
                    'Explore Actions', 'Target Actions']
@@ -58,7 +58,7 @@ def main(render=False):
 
         for episode in range(num_episodes):
 
-            print(f"Starting Episode {episode + 1}/{num_episodes}")
+            # print(f"Starting Episode {episode + 1}/{num_episodes}")
 
             # Start timing the episode
             episode_start_time = time.time()
@@ -102,11 +102,11 @@ def main(render=False):
                     screen.blit(analytics_surface, (GAME_WIDTH, 0))
 
                     pygame.display.flip()
-                    # clock.tick(60)
+                    clock.tick(500)
 
                 # Early termination condition: End the episode if fewer than 3 ants remain
-                if len(sugarscape.ants) < 3:
-                    print("Fewer than 3 ants remaining. Ending episode early.")
+                if len(sugarscape.ants) == 0:
+                    print("All ants have died. Ending episode early.")
                     break
 
             # Collect rewards for all ants after the episode ends
@@ -127,12 +127,6 @@ def main(render=False):
                 action_characteristics_list.extend(ant.selected_action_characteristics)
                 ant.selected_action_characteristics = []  # Reset for next episode
 
-            # Count true vs false locations
-            true_location_count = sum(
-                1 for action in action_characteristics_list if not action.get('is_false_location', False))
-            false_location_count = sum(
-                1 for action in action_characteristics_list if action.get('is_false_location', False))
-
             # Count explore and target actions
             total_actions = len(action_characteristics_list)
             explore_actions = sum(
@@ -147,9 +141,14 @@ def main(render=False):
             # End of episode processing
             analytics_data = sugarscape.get_analytics_data()
             average_lifespan = analytics_data.get('Average Lifespan', 0)
+            true_positives = analytics_data.get('True Positives',0)
+            false_positives = analytics_data.get('False Positives',0)
             # print(f"Episode Time: {sim_time}")
             print(f"Average Lifespan: {average_lifespan:.2f}")
-            # print(f"True Positives: {true_location_count}")
+            # print(f"True Positives: {true_positives}")
+            # print(f"False Positives: {false_positives}")
+            # print(f"explore actions: {explore_actions}")
+            # print(f"target actions: {target_actions}")
 
             # Reset action_characteristics_list for the next episode
             action_characteristics_list = []
@@ -161,14 +160,14 @@ def main(render=False):
                 'Episode': episode + 1,
                 'Average Reward': average_reward,
                 'Average Lifespan': average_lifespan,
-                'True Location Count': true_location_count,
-                'False Location Count': false_location_count,
+                'True Location Count': true_positives,
+                'False Location Count': false_positives,
                 'Explore Actions': explore_actions,
                 'Target Actions': target_actions
             })
 
             # Every 500 episodes, write collected data to CSV and clear the list
-            if (episode + 1) % 500 == 0:
+            if (episode + 1) % 100 == 0:
                 print(f"Saving data for episodes {episode + 1 - 999} to {episode + 1} to CSV.")
                 for data in training_data:
                     writer.writerow(data)
@@ -176,6 +175,7 @@ def main(render=False):
                 print(f"Data for episodes {episode + 1 - 999} to {episode + 1} saved to '{csv_file}'.")
                 training_data = []  # Clear the list for the next batch
 
+            if (episode + 1) % 500 == 0:
                 # save model checkpoints every 500 episodes
                 model_path = os.path.join(model_checkpoint_dir, f"model_episode_{episode + 1}.pth")
                 shared_agent.save_model(model_path)
@@ -190,11 +190,11 @@ def main(render=False):
             print(f"Remaining data saved to '{csv_file}'.")
 
     # After training, save the trained agent
-    shared_agent.save_model("B_trained_improved_2.pth")
-    print("Trained agent saved as 'B_trained_improved_2.pth'.")
+    shared_agent.save_model("F_trained_2_hidden.pth")
+    print("Trained agent saved as 'F_trained_2_hidden.pth'.")
 
     if render:
         pygame.quit()
 
 if __name__ == "__main__":
-    main(render=False)  # Run training
+    main(render=True)  # Run training

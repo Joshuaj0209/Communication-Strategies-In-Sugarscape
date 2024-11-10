@@ -23,7 +23,7 @@ def main(render=False):
 
     # Initialize the RL agent once
     state_size = 4  # Ant's own state features
-    action_feature_size = 4  # Features per action (communicated target)
+    action_feature_size = 5  # Features per action (communicated target)
     input_size = state_size + action_feature_size
     shared_agent = AntRLAgent(input_size)
 
@@ -34,16 +34,19 @@ def main(render=False):
     episode_lifespans = []  # For tracking average lifespans
 
     # Create a 'checkpoints' directory if it doesn't exist
-    checkpoint_dir = "checkpoints 5 - F - fixed"
+    checkpoint_dir = "checkpoints final - B2"
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
 
     # Create a 'checkpoints' directory if it doesn't exist
-    model_checkpoint_dir = "model checkpoints 5 - F - fixed"
+    model_checkpoint_dir = "model checkpoints final - B"
     if not os.path.exists(model_checkpoint_dir):
         os.makedirs(model_checkpoint_dir)
 
+    action_characteristics_list = []
+
     for episode in range(num_episodes):
+
         print(f"Starting Episode {episode + 1}/{num_episodes}")
 
         # Start timing the episode
@@ -88,7 +91,7 @@ def main(render=False):
                 screen.blit(analytics_surface, (GAME_WIDTH, 0))
 
                 pygame.display.flip()
-                # clock.tick(60)
+                clock.tick(1000)
 
             # Early termination condition: End the episode if fewer than 'min_ants_alive' remain
             if len(sugarscape.ants) < 3:
@@ -113,6 +116,20 @@ def main(render=False):
             average_reward = sum(total_rewards) / len(total_rewards)
         else:
             average_reward = 0
+        
+        # Collect action characteristics from all ants
+        for ant in sugarscape.all_ants:
+            action_characteristics_list.extend(ant.selected_action_characteristics)
+            ant.selected_action_characteristics = []  # Reset for next episode
+
+        # Count true vs false locations
+        true_location_count = sum(1 for action in action_characteristics_list if action.get('is_false_location') == False)
+        false_location_count = sum(1 for action in action_characteristics_list if action.get('is_false_location') == True)
+
+        # Count explore and target actions
+        total_actions = len(action_characteristics_list)
+        explore_actions = sum(1 for action in action_characteristics_list if action.get('type') == 'explore')
+        target_actions = total_actions - explore_actions
 
         print(f"Episode {episode + 1}; Duration: {episode_duration:.2f} seconds; Average Reward: {average_reward:.2f}")
 
@@ -123,16 +140,18 @@ def main(render=False):
         # You can collect metrics, adjust parameters, etc.
         analytics_data = sugarscape.get_analytics_data()
         average_lifespan = analytics_data.get('Average Lifespan', 0)
-        true_positives = analytics_data.get('True Positives', 0)
         print(f"Episode Time: {sim_time}")
         print(f"Average Lifespan: {average_lifespan:.2f}")
-        print(f"True Positives: {true_positives}")
+        print(f"True Positives: {true_location_count}")
+
+        # Reset action_characteristics_list for the next episode
+        action_characteristics_list = []
 
         episode_lifespans.append(average_lifespan)
 
         # **Add Checkpoint Saving Here**
-        # Save checkpoint every 100 episodes
-        if (episode + 1) % 100 == 0:
+        # Save checkpoint every 500 episodes
+        if (episode + 1) % 500 == 0:
             checkpoint_episode = episode + 1
             plt.figure(figsize=(10, 6))
             
@@ -232,4 +251,4 @@ def main(render=False):
         pygame.quit()
 
 if __name__ == "__main__":
-    main(render=False)  # Run training
+    main(render=True)  # Run training

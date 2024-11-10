@@ -6,8 +6,9 @@ import collections  # Import collections module for OrderedDict
 import numpy as np 
 
 class Ant:
-    def __init__(self, x, y, agent, ant_id):
+    def __init__(self, x, y, agent, ant_id, is_false_broadcaster=False):
         self.id = ant_id  # Unique identifier for the ant
+        self.is_false_broadcaster = is_false_broadcaster
         self.current_time = 0
         self.x = x
         self.y = y
@@ -190,7 +191,13 @@ class Ant:
             self.target = selected_action['location']
             self.is_exploring_target = False
             self.broadcast_sugar_location('accepted')
-            # print("Ant ", self.id, " has selected a new target")
+
+            if selected_action['location'] in [(patch['x'], patch['y']) for patch in sugarscape.sugar_patches]:
+                sugarscape.true_positives += 1
+            elif selected_action['location'] in sugarscape.historical_false_locations:
+                sugarscape.false_positives +=1 
+
+            sugarscape.exploit_count +=1
 
         elif selected_action['type'] == 'explore':
             self.explore()
@@ -214,7 +221,8 @@ class Ant:
         self.action_duration = action_duration  # Store for reward calculation
         # Calculate and store the reward
         self.cumulative_reward = self.calculate_reward()
-        # print(f"Reward for ant {self.id} is {self.cumulative_reward} (type: {self.current_action_type})")
+        # if self.current_action_type == 'explore':
+    #    print(f"Reward for ant {self.id} is {self.cumulative_reward} (type: {self.current_action_type})")
         # print(f"Reward for ant {self.id} is {self.cumulative_reward} (Interrupted: {interrupted})")
         self.agent.store_reward(self.id,self.cumulative_reward)
         # Also accumulate to total_episode_reward
@@ -329,6 +337,13 @@ class Ant:
             self.end_current_action(sim_time, interrupted=True)
             self.next_target_selection_time = self.current_time + self.target_selection_interval
 
+            # Check if the current action should be ended (for 'explore' actions)
+        if self.action_in_progress and self.current_time >= self.next_target_selection_time and self.current_action_type == 'explore' and not self.arrived_at_target:
+            # End the current action
+            self.end_current_action(sim_time)
+            # After ending the action, set the next target selection time
+            self.next_target_selection_time = self.current_time + self.target_selection_interval
+
 
         # Store the previous broadcast characteristic and location
         previous_characteristic = self.current_broadcast_characteristic
@@ -381,7 +396,7 @@ class Ant:
                     if valid_location:
                         valid_location_found = True
                         self.false_broadcast_location = candidate_location
-                        self.sugarscape.broadcast_times[self] = self.current_time + 800  # Schedule next change
+                        self.sugarscape.broadcast_times[self] = self.current_time + 800  # NB: change back to 1000
                     else:
                         attempts += 1
 
@@ -517,7 +532,11 @@ class Ant:
         self.x = max(0, min(self.x, GAME_WIDTH))
         self.y = max(0, min(self.y, HEIGHT))
 
-        self.health -= HEALTH_DECREASE_RATE
+        if self.is_false_broadcaster:
+            self.health -= FALSE_BROADCASTER_HEALTH_DECREASE_RATE
+        else:
+            self.health -= HEALTH_DECREASE_RATE
+
         self.lifespan += 1
           
         # Check if the ant is dead
@@ -580,30 +599,30 @@ class Ant:
 
         # Time penalty based on action duration
         if hasattr(self, 'action_duration'):
-            time_penalty = -self.action_duration * 0.04  # Adjust as needed
+            time_penalty = -self.action_duration * 0.02  # Adjust as needed
         else:
             time_penalty = 0
 
         # Total reward before distance adjustment
-        total_reward = base_reward + health_change  # + time_penalty
+        total_reward = base_reward + health_change + time_penalty
 
         # Calculate distance traveled
-        dx = self.x - self.start_x
-        dy = self.y - self.start_y
-        distance_traveled = math.hypot(dx, dy)
+        # dx = self.x - self.start_x
+        # dy = self.y - self.start_y
+        # distance_traveled = math.hypot(dx, dy)
 
-        # Normalize the distance
-        max_distance = math.hypot(GAME_WIDTH, HEIGHT)
-        distance_normalized = distance_traveled / max_distance
+        # # Normalize the distance
+        # max_distance = math.hypot(GAME_WIDTH, HEIGHT)
+        # distance_normalized = distance_traveled / max_distance
 
-        # Adjust reward based on sign using normalized distance
-        if total_reward > 0:
-            # For positive rewards, decrease reward with distance
-            adjusted_reward = total_reward * (1 - distance_normalized)
-        elif total_reward < 0:
-            # For negative rewards, increase penalty with distance
-            adjusted_reward = total_reward * (1 + distance_normalized)
-        else:
-            adjusted_reward = 0  # No adjustment needed for zero reward
+        # # Adjust reward based on sign using normalized distance
+        # if total_reward > 0:
+        #     # For positive rewards, decrease reward with distance
+        #     adjusted_reward = total_reward * (1 - distance_normalized)
+        # elif total_reward < 0:
+        #     # For negative rewards, increase penalty with distance
+        #     adjusted_reward = total_reward * (1 + distance_normalized)
+        # else:
+        #     adjusted_reward = 0  # No adjustment needed for zero reward
 
-        return adjusted_reward
+        return total_reward

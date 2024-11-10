@@ -1,0 +1,12 @@
+F2F:
+
+Overall Average Reward over 500 episodes: 5.05
+Overall Average Lifespan over 500 episodes: 3876.24
+
+Overall Average Reward over 250 episodes: 8.09
+Overall Average Lifespan over 250 episodes: 3927.45
+
+Broad:
+
+Overall Average Reward over 150 episodes: 19.99
+Overall Average Lifespan over 150 episodes: 4288.04
