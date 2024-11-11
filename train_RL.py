@@ -21,17 +21,17 @@ def main(render=False):
     input_size = state_size + action_feature_size
     shared_agent = AntRLAgent(input_size)
 
-    num_episodes = 5000  # Total number of training episodes
+    num_episodes = 15000  # Total number of training episodes
     episode_length = 30000  # Length of each episode in time steps
 
     episode_rewards = []
     episode_lifespans = []  # For tracking average lifespans
 
     # Create necessary directories if they don't exist
-    checkpoint_dir = "checkpoints 2 hidden - F"
+    checkpoint_dir = "checkpoints 4 F"
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    model_checkpoint_dir = "model checkpoints 2 hidden - F"
+    model_checkpoint_dir = "model checkpoints 4 F"
     os.makedirs(model_checkpoint_dir, exist_ok=True)
 
     action_characteristics_list = []
@@ -40,7 +40,7 @@ def main(render=False):
     training_data = []
 
     # Define CSV file path
-    csv_file = "RL_Training_F_2_hidden.csv"
+    csv_file = "RL_Training_F_fixed_4.csv"
     csv_columns = ['Episode', 'Average Reward', 'Average Lifespan',
                    'True Location Count', 'False Location Count',
                    'Explore Actions', 'Target Actions']
@@ -102,7 +102,7 @@ def main(render=False):
                     screen.blit(analytics_surface, (GAME_WIDTH, 0))
 
                     pygame.display.flip()
-                    clock.tick(500)
+                    # clock.tick(80)
 
                 # Early termination condition: End the episode if fewer than 3 ants remain
                 if len(sugarscape.ants) == 0:
@@ -167,7 +167,7 @@ def main(render=False):
             })
 
             # Every 500 episodes, write collected data to CSV and clear the list
-            if (episode + 1) % 100 == 0:
+            if (episode + 1) % 1000 == 0:
                 print(f"Saving data for episodes {episode + 1 - 999} to {episode + 1} to CSV.")
                 for data in training_data:
                     writer.writerow(data)
@@ -175,7 +175,7 @@ def main(render=False):
                 print(f"Data for episodes {episode + 1 - 999} to {episode + 1} saved to '{csv_file}'.")
                 training_data = []  # Clear the list for the next batch
 
-            if (episode + 1) % 500 == 0:
+            if (episode + 1) % 1000 == 0:
                 # save model checkpoints every 500 episodes
                 model_path = os.path.join(model_checkpoint_dir, f"model_episode_{episode + 1}.pth")
                 shared_agent.save_model(model_path)
@@ -190,11 +190,11 @@ def main(render=False):
             print(f"Remaining data saved to '{csv_file}'.")
 
     # After training, save the trained agent
-    shared_agent.save_model("F_trained_2_hidden.pth")
-    print("Trained agent saved as 'F_trained_2_hidden.pth'.")
+    shared_agent.save_model("F_trained_fixed_4.pth")
+    print("Trained agent saved as 'F_trained_fixed_4.pth'.")
 
     if render:
         pygame.quit()
 
 if __name__ == "__main__":
-    main(render=True)  # Run training
+    main(render=False)  # Run training

@@ -18,8 +18,8 @@ class SugarScape:
         ]
 
         # Initialize ants
-        # self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), shared_agent, ant_id=i) for i in range(NUM_ANTS)]
-        self.ants = [BaselineAnt(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), ant_id=i) for i in range(NUM_ANTS)]
+        self.ants = [Ant(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), shared_agent, ant_id=i) for i in range(NUM_ANTS)]
+        # self.ants = [BaselineAnt(random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT), ant_id=i) for i in range(NUM_ANTS)]
 
         self.all_ants = self.ants.copy()  # Keep a copy of all ants
 

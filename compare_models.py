@@ -1,6 +1,7 @@
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 def read_csv_data(filename):
     """
@@ -16,7 +17,7 @@ def read_csv_data(filename):
     average_lifespans = []
     true_locations = []
     false_locations = []
-    explore_actions = []
+    wander_actions = []  # Changed from 'explore_actions' to 'wander_actions'
     target_actions = []
 
     with open(filename, mode='r', newline='') as csv_file:
@@ -33,7 +34,7 @@ def read_csv_data(filename):
 
             true_locations.append(int(row['True Location Selections']))
             false_locations.append(int(row['False Location Selections']))
-            explore_actions.append(int(row['Explore Actions']))
+            wander_actions.append(int(row['Explore Actions']))  # Changed to 'wander_actions'
             target_actions.append(int(row['Target Actions']))
 
     data = {
@@ -41,7 +42,7 @@ def read_csv_data(filename):
         'average_lifespans': average_lifespans,
         'true_locations': true_locations,
         'false_locations': false_locations,
-        'explore_actions': explore_actions,
+        'wander_actions': wander_actions,  # Changed key
         'target_actions': target_actions
     }
     return data
@@ -50,32 +51,47 @@ def main():
     """
     Main function to read data from CSV files and generate the required plots.
     """
+    # Define the Evaluation folder path
+    evaluation_folder = 'Evaluation_RL_temp'
+
+    # Create the Evaluation folder if it doesn't exist
+    if not os.path.exists(evaluation_folder):
+        os.makedirs(evaluation_folder)
+        print(f"Created folder: {evaluation_folder}")
+    else:
+        print(f"Folder already exists: {evaluation_folder}")
+
     # Replace with your actual CSV filenames
-    model1_csv = 'B_baseline_evaluation.csv'  # Baseline model (Broadcasting)
-    model2_csv = 'F_baseline_evaluation.csv'  # RL model (Face-To-Face)
+    model1_csv = 'B_RL_evaluation_fixed_3.csv'  # Baseline model (Broadcasting)
+    model2_csv = 'B_RL_evaluation_fixed_4.csv'  # RL model (Face-To-Face)
 
     # Read data from CSV files
     model1_data = read_csv_data(model1_csv)
     model2_data = read_csv_data(model2_csv)
 
-    ### 1. Replace Average Lifespan Line Plot with a Box Plot ###
+    ### 1. Box Plot for Average Lifespan ###
     plt.figure(figsize=(10, 6))
     data_to_plot = [model1_data['average_lifespans'], model2_data['average_lifespans']]
     
     # Create box plot
-    plt.boxplot(data_to_plot, labels=['Broadcasting', 'Face-To-Face'], patch_artist=True,
+    box = plt.boxplot(data_to_plot, labels=['Broadcasting', 'Face-To-Face'], patch_artist=True,
                 boxprops=dict(facecolor='lightblue', color='blue'),
                 medianprops=dict(color='red'),
                 whiskerprops=dict(color='blue'),
                 capprops=dict(color='blue'),
                 flierprops=dict(color='blue', markeredgecolor='blue'))
-    
+
     plt.ylabel('Average Lifespan')
     plt.title('Average Lifespan Distribution per Communication Strategy')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.show()
+    
+    # Save the box plot to the Evaluation folder
+    box_plot_path = os.path.join(evaluation_folder, 'average_lifespan_boxplot.png')
+    plt.savefig(box_plot_path)
+    plt.close()
+    print(f"Box plot saved to: {box_plot_path}")
 
-    ### 2. Add a Bar Chart Comparing Model1 and Model2's Average Lifespan ###
+    ### 2. Bar Chart Comparing Average Lifespan ###
     # Calculate the mean of average lifespans, ignoring NaN values
     mean_lifespan_model1 = np.nanmean(model1_data['average_lifespans'])
     mean_lifespan_model2 = np.nanmean(model2_data['average_lifespans'])
@@ -87,23 +103,28 @@ def main():
     
     bars = plt.bar(models, means, color=colors, edgecolor='black')
 
-    # Add numerical labels on top of the bars
+    # Add numerical count labels above the bars
     for bar in bars:
         height = bar.get_height()
-        plt.annotate(f'{height:.2f}',
+        plt.annotate(f'{height:.2f}',  # Numerical count
                     xy=(bar.get_x() + bar.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
+                    xytext=(0, 5),  # 5 points vertical offset
                     textcoords="offset points",
                     ha='center', va='bottom',
                     fontsize=12, fontweight='bold')
 
     plt.ylabel('Average Lifespan')
-    plt.title('Comparison of Average Lifespan Between Models')
-    plt.ylim(0, max(means)*1.2)  # Add some space on top for labels
+    plt.title('Average Lifespan per Communication Strategies (RL)')
+    plt.ylim(0, max(means)*1.3)  # Add some space on top for labels
     plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.show()
+    
+    # Save the bar chart to the Evaluation folder
+    bar_chart_path = os.path.join(evaluation_folder, 'average_lifespan_comparison.png')
+    plt.savefig(bar_chart_path)
+    plt.close()
+    print(f"Bar chart saved to: {bar_chart_path}")
 
-    ### 3. Plot Average True vs False Location Selections as Grouped Bar Chart ###
+    ### 3. Grouped Bar Chart for True vs False Location Selections ###
     plt.figure(figsize=(10, 6))
     width = 0.35  # Width of the bars
 
@@ -126,62 +147,91 @@ def main():
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel('Average Location Selections per Episode')
-    ax.set_title('Average True vs False Location Selections per Communication Strategy')
+    ax.set_title('Average True vs False Location Selections per Communication Strategy (RL)')
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.legend()
 
-    # Add numerical labels on top of the bars
-    def autolabel(rects):
-        """Attach a text label above each bar in *rects*, displaying its height."""
-        for rect in rects:
-            height = rect.get_height()
-            ax.annotate(f'{height:.2f}',
-                        xy=(rect.get_x() + rect.get_width() / 2, height),
-                        xytext=(0, 3),  # 3 points vertical offset
-                        textcoords="offset points",
-                        ha='center', va='bottom',
-                        fontsize=10, fontweight='bold')
-
-    autolabel(rects1)
-    autolabel(rects2)
+    # Calculate and annotate percentages above the bars
+    for i in range(len(labels)):
+        # Calculate total for the group
+        total = true_averages[i] + false_averages[i]
+        if total > 0:
+            true_pct = (true_averages[i] / total) * 100
+            false_pct = (false_averages[i] / total) * 100
+            
+            # Annotate True Location Selections
+            ax.text(x[i] - width/2, true_averages[i] + (max(true_averages + false_averages) * 0.01),
+                    f'{true_pct:.1f}%', ha='center', va='bottom', fontsize=10, color='blue', fontweight='bold')
+            
+            # Annotate False Location Selections
+            ax.text(x[i] + width/2, false_averages[i] + (max(true_averages + false_averages) * 0.01),
+                    f'{false_pct:.1f}%', ha='center', va='bottom', fontsize=10, color='grey', fontweight='bold')
+        else:
+            ax.text(x[i] - width/2, 1, '0%', ha='center', va='bottom', fontsize=10, color='blue')
+            ax.text(x[i] + width/2, 1, '0%', ha='center', va='bottom', fontsize=10, color='grey')
 
     plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.show()
+    
+    # Save the grouped bar chart to the Evaluation folder
+    grouped_bar_chart_path = os.path.join(evaluation_folder, 'true_false_location_selections.png')
+    plt.savefig(grouped_bar_chart_path)
+    plt.close()
+    print(f"Grouped bar chart (True vs False Locations) saved to: {grouped_bar_chart_path}")
 
-    ### 4. Plot Average Explore vs Target Actions as Grouped Bar Chart ###
+    ### 4. Grouped Bar Chart for Wander vs Target Actions ###
     plt.figure(figsize=(10, 6))
     width = 0.35  # Width of the bars
 
-    # Calculate average explore and target actions per episode for each model
-    average_explore_model1 = np.nanmean(model1_data['explore_actions'])
+    # Calculate average wander and target actions per episode for each model
+    average_wander_model1 = np.nanmean(model1_data['wander_actions'])  # Changed from 'explore_actions'
     average_target_model1 = np.nanmean(model1_data['target_actions'])
-    average_explore_model2 = np.nanmean(model2_data['explore_actions'])
+    average_wander_model2 = np.nanmean(model2_data['wander_actions'])  # Changed from 'explore_actions'
     average_target_model2 = np.nanmean(model2_data['target_actions'])
 
     # Data for grouped bar chart
-    explore_averages = [average_explore_model1, average_explore_model2]
+    wander_averages = [average_wander_model1, average_wander_model2]  # Changed variable name
     target_averages = [average_target_model1, average_target_model2]
 
     x = np.arange(len(labels))  # Label locations
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    rects1 = ax.bar(x - width/2, explore_averages, width, label='Explore Actions', color='lightgrey', edgecolor='black')
+    rects1 = ax.bar(x - width/2, wander_averages, width, label='Wander Actions', color='lightgrey', edgecolor='black')  # Changed label
     rects2 = ax.bar(x + width/2, target_averages, width, label='Target Actions', color='lightblue', edgecolor='black')
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel('Average Actions per Episode')
-    ax.set_title('Average Explore vs Target Actions per Communication Strategy')
+    ax.set_title('Average Wander vs Target Actions per Communication Strategy (Rule-Based)')
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.legend()
 
-    # Add numerical labels on top of the bars
-    autolabel(rects1)
-    autolabel(rects2)
+    # Calculate and annotate percentages above the bars
+    for i in range(len(labels)):
+        # Calculate total for the group
+        total = wander_averages[i] + target_averages[i]
+        if total > 0:
+            wander_pct = (wander_averages[i] / total) * 100
+            target_pct = (target_averages[i] / total) * 100
+            
+            # Annotate Wander Actions
+            ax.text(x[i] - width/2, wander_averages[i] + (max(wander_averages + target_averages) * 0.01),
+                    f'{wander_pct:.1f}%', ha='center', va='bottom', fontsize=10, color='grey', fontweight='bold')
+            
+            # Annotate Target Actions
+            ax.text(x[i] + width/2, target_averages[i] + (max(wander_averages + target_averages) * 0.01),
+                    f'{target_pct:.1f}%', ha='center', va='bottom', fontsize=10, color='blue', fontweight='bold')
+        else:
+            ax.text(x[i] - width/2, 1, '0%', ha='center', va='bottom', fontsize=10, color='grey')
+            ax.text(x[i] + width/2, 1, '0%', ha='center', va='bottom', fontsize=10, color='blue')
 
     plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.show()
+    
+    # Save the grouped bar chart to the Evaluation folder
+    explore_target_bar_chart_path = os.path.join(evaluation_folder, 'wander_target_actions.png')  # Changed filename
+    plt.savefig(explore_target_bar_chart_path)
+    plt.close()
+    print(f"Grouped bar chart (Wander vs Target Actions) saved to: {explore_target_bar_chart_path}")
 
 if __name__ == '__main__':
     main()

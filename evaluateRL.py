@@ -29,7 +29,7 @@ def main(render=False):
     shared_agent = AntRLAgent(input_size)
 
     # Load the trained model
-    trained_model_path = "B_trained.pth"  # Replace with your model filename
+    trained_model_path = "F_trained_fixed_3.pth"  # Replace with your model filename
     shared_agent.load_model(trained_model_path)
 
     num_episodes = 500  # Define the number of evaluation episodes
@@ -41,7 +41,7 @@ def main(render=False):
     action_characteristics_list = []
 
     # Set the CSV filename based on the model being evaluated
-    csv_filename = 'B_RL_evaluation.csv'  # You can change 'model1' to reflect your model's name
+    csv_filename = 'F_RL_evaluation_fixed_3.csv'  # You can change 'model1' to reflect your model's name
 
     # Open the CSV file and write the headers
     with open(csv_filename, mode='w', newline='') as csv_file:

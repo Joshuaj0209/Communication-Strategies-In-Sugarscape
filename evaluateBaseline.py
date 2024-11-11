@@ -29,7 +29,7 @@ def main(render=False):
     action_characteristics_list = []
 
     # Set the CSV filename based on the model being evaluated
-    csv_filename = 'B_baseline_evaluation.csv'  # You can change 'Baseline' to reflect your model's name
+    csv_filename = 'F_baseline_evaluation.csv'  # You can change 'Baseline' to reflect your model's name
 
     # Open the CSV file and write the headers
     with open(csv_filename, mode='w', newline='') as csv_file:
@@ -79,7 +79,7 @@ def main(render=False):
                 screen.blit(analytics_surface, (GAME_WIDTH, 0))
 
                 pygame.display.flip()
-                clock.tick(1000)  # Limit the frame rate to 60 FPS
+                clock.tick(150)  # Limit the frame rate to 60 FPS
 
             # Early termination condition: End the episode if fewer than 'min_ants_alive' remain
             if len(sugarscape.ants) == 0:
@@ -133,4 +133,4 @@ def main(render=False):
         pygame.quit()
 
 if __name__ == "__main__":
-    main(render=True)  # Set render=True to visualize the simulation
+    main(render=False)  # Set render=True to visualize the simulation

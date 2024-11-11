@@ -135,7 +135,7 @@ class BaselineAnt:
                     rejected = counts.get('rejected', 0)
 
                     # Calculate score based on the rule-based function
-                    score = (2*confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)  ## 
+                    score = (confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)  ## 
                     viable_targets.append((location, score))
 
                     # Collect action characteristics for evaluation
@@ -197,6 +197,9 @@ class BaselineAnt:
                 })
 
             self.action_in_progress = True
+        
+            self.next_target_selection_time = self.current_time + self.target_selection_interval
+
 
 
 
@@ -273,7 +276,7 @@ class BaselineAnt:
         previous_target = self.target
 
         # Detect sugar only if not in action or if the action is 'explore'
-        if not self.action_in_progress or self.is_exploring_target:
+        if self.target is None:
             sugar_detected, target_changed = self.detect_sugar(sugar_patches)
         else:
             sugar_detected, target_changed = False, False
@@ -283,6 +286,7 @@ class BaselineAnt:
             self.next_target_selection_time = self.current_time + self.target_selection_interval
 
         if self.action_in_progress and self.current_time >= self.next_target_selection_time and self.current_action_type == 'explore' and not self.arrived_at_target:
+            self.action_in_progress = False
             # After ending the action, set the next target selection time
             self.next_target_selection_time = self.current_time + self.target_selection_interval
 
@@ -371,8 +375,9 @@ class BaselineAnt:
                     # No viable targets; explore
                     self.explore()
                     sugarscape.explore_count += 1
-                self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
-                self.next_target_selection_time = self.current_time + self.target_selection_interval
+                self.action_in_progress = True
+                # self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
+                # self.next_target_selection_time = self.current_time + self.target_selection_interval
 
         if self.target:
             dx = self.target[0] - self.x
@@ -431,6 +436,8 @@ class BaselineAnt:
                 if not self.arrived_at_target:
                     self.arrived_at_target = True
                     self.frames_since_arrival = 0
+
+                self.next_target_selection_time = self.current_time + self.target_selection_interval
 
             else:
                 self.direction = math.atan2(dy, dx)

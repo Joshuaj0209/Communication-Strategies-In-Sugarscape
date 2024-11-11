@@ -209,6 +209,9 @@ class Ant:
         self.start_y = self.y
         # print(f"ant {self.id} selected new action (type: {self.current_action_type})")
 
+        self.next_target_selection_time = sim_time + self.target_selection_interval
+
+
     def explore(self):
         # Exploration logic: move randomly within the environment
         # self.target = (random.randint(0, GAME_WIDTH), random.randint(0, HEIGHT))
@@ -222,7 +225,7 @@ class Ant:
         # Calculate and store the reward
         self.cumulative_reward = self.calculate_reward()
         # if self.current_action_type == 'explore':
-    #    print(f"Reward for ant {self.id} is {self.cumulative_reward} (type: {self.current_action_type})")
+        # print(f"Reward for ant {self.id} is {self.cumulative_reward} (type: {self.current_action_type})")
         # print(f"Reward for ant {self.id} is {self.cumulative_reward} (Interrupted: {interrupted})")
         self.agent.store_reward(self.id,self.cumulative_reward)
         # Also accumulate to total_episode_reward
@@ -327,7 +330,7 @@ class Ant:
         previous_target = self.target
 
         # Detect sugar only if not in action or if the action is 'explore'
-        if not self.action_in_progress or self.is_exploring_target:
+        if self.target is None:
             sugar_detected, target_changed = self.detect_sugar(sugar_patches)
         else:
             sugar_detected, target_changed = False, False
@@ -425,14 +428,16 @@ class Ant:
         # Movement logic that might change self.target
         if not sugar_detected and not self.target and self.needs_to_eat() and not self.action_in_progress:
             if self.current_time >= self.next_target_selection_time:
-                if self.communicated_targets:
-                    self.select_new_target(sugarscape, sim_time)
-                else:
+                # if self.communicated_targets:
+                self.select_new_target(sugarscape, sim_time)
+                # else:
                     # No viable targets; explore
-                    self.explore()
-                    sugarscape.explore_count += 1
-                self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
-                self.next_target_selection_time = self.current_time + self.target_selection_interval
+                    # self.explore()
+                    # sugarscape.explore_count += 1
+                self.action_in_progress = True
+
+                # self.target_selection_interval = max(300, random.gauss(self.mean_interval, self.std_deviation))
+                # self.next_target_selection_time = self.current_time + self.target_selection_interval
 
 
         if self.target:
@@ -500,6 +505,8 @@ class Ant:
                 if not self.arrived_at_target:
                     self.arrived_at_target = True
                     self.frames_since_arrival = 0
+
+                self.next_target_selection_time = self.current_time + self.target_selection_interval
 
 
             else:
