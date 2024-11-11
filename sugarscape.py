@@ -162,13 +162,14 @@ class SugarScape:
             pygame.draw.circle(screen, (135, 206, 235, 128), (int(ant.x), int(ant.y)), COMMUNICATION_RADIUS, 1)  # Light blue, semi-transparent
             
             # Draw the ant itself
-            color = GREEN if ant in self.false_broadcasters else RED
+            # color = GREEN if ant in self.false_broadcasters else RED
+            color = RED
             pygame.draw.circle(screen, color, (int(ant.x), int(ant.y)), ANT_SIZE)
 
             # Render and draw the ant's ID number on top of it
             ant_id_text = font.render(str(ant.id), True, BLACK)  # Convert ant.id to string
             text_rect = ant_id_text.get_rect(center=(int(ant.x), int(ant.y) - ANT_SIZE - 10))  # Position text above the ant
-            screen.blit(ant_id_text, text_rect)
+            # screen.blit(ant_id_text, text_rect)
             
         # Collect all false broadcast locations from false broadcasters
         false_locations = set()
@@ -179,7 +180,7 @@ class SugarScape:
         # Draw a red square at each false location
         for location in self.historical_false_locations:
             x, y = location
-            pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(int(x) - 3, int(y) - 3, 6, 6))
+            # pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(int(x) - 3, int(y) - 3, 6, 6))
 
 
     def get_analytics_data(self):

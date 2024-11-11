@@ -52,7 +52,7 @@ def main():
     Main function to read data from CSV files and generate the required plots.
     """
     # Define the Evaluation folder path
-    evaluation_folder = 'Evaluation_RL_temp'
+    evaluation_folder = 'Evaluation_baseline_2'
 
     # Create the Evaluation folder if it doesn't exist
     if not os.path.exists(evaluation_folder):
@@ -62,8 +62,8 @@ def main():
         print(f"Folder already exists: {evaluation_folder}")
 
     # Replace with your actual CSV filenames
-    model1_csv = 'B_RL_evaluation_fixed_3.csv'  # Baseline model (Broadcasting)
-    model2_csv = 'B_RL_evaluation_fixed_4.csv'  # RL model (Face-To-Face)
+    model1_csv = 'B_baseline_evaluation_2.csv'  # Baseline model (Broadcasting)
+    model2_csv = 'F_baseline_evaluation_2.csv'  # RL model (Face-To-Face)
 
     # Read data from CSV files
     model1_data = read_csv_data(model1_csv)
@@ -201,7 +201,7 @@ def main():
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel('Average Actions per Episode')
-    ax.set_title('Average Wander vs Target Actions per Communication Strategy (Rule-Based)')
+    ax.set_title('Average Wander vs Target Actions per Communication Strategy (RL)')
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.legend()

@@ -78,6 +78,8 @@ class Ant:
 
         self.start_x = x
         self.start_y = y
+
+        self.last_location = None
         
     def detect_sugar(self, sugar_patches):
         closest_sugar = None
@@ -488,6 +490,7 @@ class Ant:
                 if found_sugar:
                     if self.health >= self.initial_health or sugar['count'] <= 0:
                         # Ant's health is replenished or sugar is depleted
+                        self.last_location = self.target
                         self.target = None
                         self.is_exploring_target = None
                         self.has_reached_target = False  # Reset for the next action
@@ -497,6 +500,7 @@ class Ant:
                         # Continue to consume sugar in subsequent moves
                 else:
                     # No sugar found at the location, so move on
+                    self.last_location = self.target
                     self.target = None
                     self.is_exploring_target = None
                     self.has_reached_target = False  # Reset for the next action

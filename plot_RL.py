@@ -74,8 +74,8 @@ def plot_moving_average(datasets, window_size, xlabel, ylabel, title, filename):
 
 def main():
     # File paths
-    training_file = "RL_Training_B_fixed_4.csv"      # Face-To-Face
-    complete_file = "RL_Training_B_fixed_3.csv"     # Widespread Broadcasting
+    training_file = "RL_Training_B_fixed_10.csv"      # Face-To-Face
+    complete_file = "RL_Training_B_fixed_4.csv"     # Widespread Broadcasting
 
     # Flag to include the second CSV file
     include_complete = True  # Set to True to include the second CSV
@@ -151,7 +151,7 @@ def main():
                 'linestyle': '-'  # Solid line
             })
 
-    window_size = 250  # Window size for moving average
+    window_size = 100  # Window size for moving average
 
     # Plot 1: Moving average of average reward over episodes
     plot_moving_average(

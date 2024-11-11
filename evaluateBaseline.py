@@ -13,6 +13,84 @@ import csv  # Import csv module
 def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
 
+def plot_histograms(action_characteristics):
+    # Initialize lists to hold counts
+    confirmed_counts = []
+    rejected_counts = []
+    accepted_counts = []
+
+    # Iterate through all action characteristics
+    for action in action_characteristics:
+        if action.get('type') == 'target':
+            counts = action.get('counts', {})
+            confirmed = counts.get('confirmed', 0)
+            rejected = counts.get('rejected', 0)
+            accepted = counts.get('accepted', 0)
+
+            confirmed_counts.append(confirmed)
+            rejected_counts.append(rejected)
+            accepted_counts.append(accepted)
+
+    # Define bin edges with bin size 2
+    max_count = max(
+        max(confirmed_counts, default=0),
+        max(rejected_counts, default=0),
+        max(accepted_counts, default=0)
+    )
+    bins = range(0, max_count + 3, 1)  # +3 to include the last bin
+
+    # Plotting
+    plt.figure(figsize=(18, 5))
+
+    # Confirmed Histogram
+    plt.subplot(1, 3, 1)
+    total_confirmed = len(confirmed_counts)
+    if total_confirmed > 0:
+        weights_confirmed = np.ones_like(confirmed_counts) / total_confirmed * 100
+    else:
+        weights_confirmed = None
+    plt.hist(confirmed_counts, bins=bins, color='skyblue', edgecolor='black', weights=weights_confirmed)
+    plt.title('Confirmed Counts')
+    plt.xlabel('Number of Confirmed')
+    plt.ylabel('Percentage')
+    plt.xticks(bins)
+    plt.ylim(0, 100)
+
+    # Rejected Histogram
+    plt.subplot(1, 3, 2)
+    total_rejected = len(rejected_counts)
+    if total_rejected > 0:
+        weights_rejected = np.ones_like(rejected_counts) / total_rejected * 100
+    else:
+        weights_rejected = None
+    plt.hist(rejected_counts, bins=bins, color='salmon', edgecolor='black', weights=weights_rejected)
+    plt.title('Rejected Counts')
+    plt.xlabel('Number of Rejected')
+    plt.ylabel('Percentage')
+    plt.xticks(bins)
+    plt.ylim(0, 100)
+
+    # Accepted Histogram
+    plt.subplot(1, 3, 3)
+    total_accepted = len(accepted_counts)
+    if total_accepted > 0:
+        weights_accepted = np.ones_like(accepted_counts) / total_accepted * 100
+    else:
+        weights_accepted = None
+    plt.hist(accepted_counts, bins=bins, color='lightgreen', edgecolor='black', weights=weights_accepted)
+    plt.title('Accepted Counts')
+    plt.xlabel('Number of Accepted')
+    plt.ylabel('Percentage')
+    plt.xticks(bins)
+    plt.ylim(0, 100)
+
+    plt.tight_layout()
+    plt.show()
+
+    # Optionally, save the figure
+    plt.savefig('action_characteristics_histograms.png')
+    print("Histograms saved as 'action_characteristics_histograms.png'")
+
 def main(render=False):
     if render:
         pygame.init()
@@ -27,9 +105,10 @@ def main(render=False):
     episode_lifespans = []  # For tracking average lifespans
 
     action_characteristics_list = []
+    all_action_characteristics = []  # To store all action characteristics across episodes
 
     # Set the CSV filename based on the model being evaluated
-    csv_filename = 'F_baseline_evaluation.csv'  # You can change 'Baseline' to reflect your model's name
+    csv_filename = 'F_baseline_evaluation_2.csv'  # You can change 'Baseline' to reflect your model's name
 
     # Open the CSV file and write the headers
     with open(csv_filename, mode='w', newline='') as csv_file:
@@ -91,6 +170,9 @@ def main(render=False):
             action_characteristics_list.extend(ant.selected_action_characteristics)
             ant.selected_action_characteristics = []  # Reset for next episode
 
+        # Append to all_action_characteristics
+        all_action_characteristics.extend(action_characteristics_list)
+
         # End of episode timing
         episode_end_time = time.time()
         episode_duration = episode_end_time - episode_start_time
@@ -98,8 +180,8 @@ def main(render=False):
         # Collect and print other metrics
         analytics_data = sugarscape.get_analytics_data()
         average_lifespan = analytics_data.get('Average Lifespan', 0)
-        true_positives = analytics_data.get('True Positives',0)
-        false_positives = analytics_data.get('False Positives',0)
+        true_positives = analytics_data.get('True Positives', 0)
+        false_positives = analytics_data.get('False Positives', 0)
         print(f"Episode Time: {sim_time}")
         print(f"Average Lifespan: {average_lifespan:.2f}")
 
@@ -131,6 +213,9 @@ def main(render=False):
 
     if render:
         pygame.quit()
+
+    # Plot Histograms
+    plot_histograms(all_action_characteristics)
 
 if __name__ == "__main__":
     main(render=False)  # Set render=True to visualize the simulation

@@ -66,6 +66,7 @@ class BaselineAnt:
 
         self.action_in_progress = False
 
+        self.last_location = None  # Initialize last_location
 
 
     def detect_sugar(self, sugar_patches):
@@ -98,19 +99,6 @@ class BaselineAnt:
             self.health_at_action_start = self.health  # Record health at action start
             # health_threshold = 0.9  # 90% of max health
 
-            # if self.health / self.initial_health > health_threshold:
-            #     # Decide to explore
-            #     # print("exploring due to health")
-            #     self.explore()
-            #     sugarscape.explore_count += 1
-            #     self.current_action_type = 'explore'
-            #     # For evaluation, record the explore action
-            #     self.selected_action_characteristics.append({
-            #         'type': 'explore',
-            #         'is_false_location': None,
-            #     })
-            #     return
-
             max_distance = math.hypot(GAME_WIDTH, HEIGHT)
             viable_targets = []
             total_weight = 0
@@ -133,9 +121,10 @@ class BaselineAnt:
                     confirmed = counts.get('confirmed', 0)
                     accepted = counts.get('accepted', 0)
                     rejected = counts.get('rejected', 0)
+                    # print("Rejected:", rejected)
 
                     # Calculate score based on the rule-based function
-                    score = (confirmed + 0.5 * accepted) / (rejected + 1) / (distance**2 + 1)  ## 
+                    score = (confirmed + 0.5* accepted) / (rejected + 1) / (distance**2 + 1)  ## 
                     viable_targets.append((location, score))
 
                     # Collect action characteristics for evaluation
@@ -305,9 +294,9 @@ class BaselineAnt:
                 self.current_broadcast_characteristic = 'confirmed'
             elif location in self.confirmed_false_locations:
                 self.current_broadcast_characteristic = 'rejected'
+                # print("Rejecting")
             else:
                 self.current_broadcast_characteristic = 'accepted'
-
             self.broadcast_sugar_location(self.current_broadcast_characteristic)
         else:
             # If the ant has no target or last location, reset the current broadcast characteristic
@@ -412,6 +401,7 @@ class BaselineAnt:
 
                 if not found_sugar:
                     self.confirmed_false_locations.add(self.target)
+                    # print("Added target ",self.target, "to confirmed false locations")
                     if not self.is_exploring_target and not self.has_reached_target:
                         pass  # Placeholder for any additional logic
 
@@ -419,6 +409,8 @@ class BaselineAnt:
                 if found_sugar:
                     if self.health >= self.initial_health or sugar['count'] <= 0:
                         # Ant's health is replenished or sugar is depleted
+                        self.last_location = self.target  # Save the last target location
+
                         self.target = None
                         self.is_exploring_target = None
                         self.has_reached_target = False  # Reset for the next action
@@ -428,6 +420,7 @@ class BaselineAnt:
                         # Continue to consume sugar in subsequent moves
                 else:
                     # No sugar found at the location, so move on
+                    self.last_location = self.target  # Save the last target location
                     self.target = None
                     self.is_exploring_target = None
                     self.has_reached_target = False  # Reset for the next action
