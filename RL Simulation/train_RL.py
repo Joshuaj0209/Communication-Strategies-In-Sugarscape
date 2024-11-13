@@ -28,10 +28,10 @@ def main(render=False):
     episode_lifespans = []  # For tracking average lifespans
 
     # Create necessary directories if they don't exist
-    checkpoint_dir = "checkpoints 4 B"
+    checkpoint_dir = "checkpoints B"
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    model_checkpoint_dir = "model checkpoints 4 B"
+    model_checkpoint_dir = "model checkpoints B"
     os.makedirs(model_checkpoint_dir, exist_ok=True)
 
     action_characteristics_list = []
@@ -39,8 +39,13 @@ def main(render=False):
     # Initialize a list to store training data per episode
     training_data = []
 
+    base_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of this script
+    csv_dir = os.path.join(base_dir, "Training")   # Change this to RL_Training_F.csv if you want to train the face-to-face agent
+   
     # Define CSV file path
-    csv_file = "RL_Training_B_fixed_10.csv"
+    os.makedirs(csv_dir, exist_ok=True)
+
+    csv_file = os.path.join(csv_dir, "RL_Training_B.csv")
     csv_columns = ['Episode', 'Average Reward', 'Average Lifespan',
                    'True Location Count', 'False Location Count',
                    'Explore Actions', 'Target Actions']
@@ -189,12 +194,17 @@ def main(render=False):
             csvfile.flush()
             print(f"Remaining data saved to '{csv_file}'.")
 
+    # Resolve the path to the trained model dynamically
+    base_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of this script
+    trained_model_path = os.path.join(base_dir, "RL_Models", "Broadcast_trained_1.pth")   # Change this to Face_trained.pth if you want to train the face-to-face agent
+    
+
     # After training, save the trained agent
-    shared_agent.save_model("B_trained_fixed_10.pth")
-    print("Trained agent saved as 'B_trained_fixed_10.pth'.")
+    shared_agent.save_model(trained_model_path)
+    print("Trained agent saved")
 
     if render:
         pygame.quit()
 
 if __name__ == "__main__":
-    main(render=True)  # Run training
+    main(render=False)  # Run training
