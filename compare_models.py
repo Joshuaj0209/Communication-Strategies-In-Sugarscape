@@ -62,8 +62,8 @@ def main():
         print(f"Folder already exists: {evaluation_folder}")
 
     # Replace with your actual CSV filenames
-    model1_csv = 'B_baseline_evaluation_2.csv'  # Baseline model (Broadcasting)
-    model2_csv = 'F_baseline_evaluation_2.csv'  # RL model (Face-To-Face)
+    model1_csv = 'B_baseline_evaluation_2.csv'  # Broadcasting
+    model2_csv = 'F_baseline_evaluation_2.csv'  # Face-To-Face
 
     # Read data from CSV files
     model1_data = read_csv_data(model1_csv)
